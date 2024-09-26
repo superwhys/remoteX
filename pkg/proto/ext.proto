@@ -1,0 +1,21 @@
+syntax = "proto2";
+
+package ext;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/superwhys/remoteX/pkg/proto/ext";
+
+
+extend google.protobuf.FieldOptions {
+  optional string json = 75006;
+  optional string yaml = 75007;
+  optional bool   node_id = 75009;
+  optional string goname = 75010;
+  optional string gotype = 75011;
+  optional bool nullable = 75012;
+}
+
+extend google.protobuf.EnumValueOptions {
+  optional string enumgoname = 76010;
+}

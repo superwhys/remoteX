@@ -1,0 +1,36 @@
+syntax = "proto3";
+package protocol;
+
+import "ext.proto";
+
+message Address {
+  string  ip_address = 1 [(ext.yaml) = "addr"];
+  int32   port = 2 [(ext.yaml) = "port"];
+  string  schema = 3 [(ext.yaml) = "schema"];
+}
+
+enum ConnectionProtocol {
+  CONNECTION_PROTOCOL_TCP = 0;
+  CONNECTION_PROTOCOL_UDP = 1;
+}
+
+enum ConnectionType {
+  CONNECTION_TYPE_SERVER = 0;
+  CONNECTION_TYPE_CLIENT = 1;
+}
+
+enum ConnectionStatus {
+  CONNECTION_STATUS_BEFORE_AUTH = 0;
+  CONNECTION_STATUS_CONNECTING = 1;
+  CONNECTION_STATUS_CONNECTED = 3;
+  CONNECTION_STATUS_DISCONNECTED = 4;
+  CONNECTION_STATUS_FAILED = 5;
+}
+
+message Hello {
+  string device_name = 1;
+  string client_name = 2;
+  string client_version = 3;
+  int32  num_connections = 4;
+  int64  timestamp = 5;
+}

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package connection;
+
+import "domain/node/node.proto";
+import "ext.proto";
+import "pkg/protocol/protocol.proto";
+
+message Connection {
+    string connection_id = 1;
+	  string node_id = 2 [(ext.goname) = "NodeId", (ext.json) = "node_id", (ext.node_id) = true];
+    protocol.ConnectionProtocol protocol = 3;
+    protocol.ConnectionType connect_type = 4;
+    protocol.ConnectionStatus status = 5;
+    int64 start_time = 6;
+    int64 last_heartbeat = 7;
+}

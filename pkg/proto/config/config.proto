@@ -1,0 +1,15 @@
+syntax = "proto3";
+package config;
+
+import "domain/node/node.proto";
+import "ext.proto";
+
+message TlsConfig {
+  string cert_file = 1 [(ext.yaml) = "cert"];
+  string key_file = 2[(ext.yaml) = "key"];
+}
+
+message Config {
+  node.Node local_node = 1 [(ext.yaml) = "local_node"];
+  TlsConfig tls = 2[(ext.yaml) = "tls"];
+}

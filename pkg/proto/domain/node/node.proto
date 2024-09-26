@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package node;
+
+import "ext.proto";
+import "pkg/protocol/protocol.proto";
+
+enum NodeStatus {
+  NODE_STATUS_UNKNOWN = 0;
+  NODE_STATUS_ONLINE = 1;
+  NODE_STATUS_OFFLINE = 2;
+}
+
+enum NodeOS {
+  NODE_OS_UNKNOWN = 0;
+  NODE_OS_WIN = 1;
+  NODE_OS_LINUX = 2;
+  NODE_OS_DARWIN = 3;
+}
+
+enum NodeArch {
+  NODE_ARCH_UNKNOWN = 0;
+  NODE_ARCH_X86 = 1;
+  NODE_ARCH_ARM = 2;
+}
+
+message NodeConfiguration {
+  NodeOS os = 1;
+  NodeArch arch = 2;
+  NodeTransConfiguration transmission = 3 [(ext.nullable) = true];
+  map<string, string> additional_info = 4;
+}
+
+message NodeTransConfiguration {
+  int32 max_send_kbps = 1;
+  int32 max_recv_kbps = 2;
+}
+
+message Node {
+  string id = 1 [(ext.goname) = "NodeId", (ext.json) = "node_id", (ext.node_id) = true];
+  string connection_id = 2;
+  string name = 3 [(ext.yaml) = "name", (ext.node_id) = true];
+  protocol.Address address = 4 [(ext.yaml) = "address"];
+  NodeStatus status = 5;
+  NodeConfiguration configuration = 6 [(ext.nullable) = true];
+  int64 last_heartbeat = 7;
+}
