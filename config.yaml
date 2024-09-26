@@ -1,9 +1,0 @@
-config:
-  local_node:
-    address:
-      addr: 0.0.0.0
-      port: 21012
-      schema: tcp
-  tls:
-    cert: cert.pem
-    key: key.pem

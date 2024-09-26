@@ -3,11 +3,11 @@ package dialer
 import (
 	"context"
 	"crypto/tls"
-	"net"
 	"net/url"
 	"time"
 	
 	"github.com/superwhys/remoteX/domain/connection"
+	connPkg "github.com/superwhys/remoteX/pkg/connection"
 	"github.com/superwhys/remoteX/pkg/protocol"
 	"github.com/superwhys/remoteX/pkg/tlsutils"
 )
@@ -32,7 +32,7 @@ func (t *tcpDialer) Dial(ctx context.Context, target *url.URL) (connection.TlsCo
 		return nil, err
 	}
 	
-	if err := t.setTcpOptions(conn); err != nil {
+	if err := connPkg.SetTcpOptions(conn); err != nil {
 		return nil, err
 	}
 	
@@ -42,9 +42,12 @@ func (t *tcpDialer) Dial(ctx context.Context, target *url.URL) (connection.TlsCo
 		return nil, err
 	}
 	
+	sc := connPkg.NewTcpConnectionClient(tc)
 	connId := connection.GenerateConnectionID(t.Local.Host, target.Host)
 	c := &connection.Connection{
 		ConnectionId:  connId,
+		LocalAddress:  tc.LocalAddr().String(),
+		RemoteAddress: tc.RemoteAddr().String(),
 		Protocol:      protocol.ConnectionProtocolTcp,
 		ConnectType:   protocol.ConnectionTypeClient,
 		Status:        protocol.ConnectionStatusBeforeAuth,
@@ -52,26 +55,7 @@ func (t *tcpDialer) Dial(ctx context.Context, target *url.URL) (connection.TlsCo
 		LastHeartbeat: time.Now().Unix(),
 	}
 	
-	return connection.NewInternalConn(tc, c), nil
-}
-
-func (t *tcpDialer) setTcpOptions(conn net.Conn) (err error) {
-	tcpConn := conn.(*net.TCPConn)
-	
-	if err = tcpConn.SetLinger(0); err != nil {
-		return err
-	}
-	if err = tcpConn.SetNoDelay(false); err != nil {
-		return err
-	}
-	if err = tcpConn.SetKeepAlivePeriod(60 * time.Second); err != nil {
-		return err
-	}
-	if err = tcpConn.SetKeepAlive(true); err != nil {
-		return err
-	}
-	
-	return
+	return connection.NewInternalConnection(sc, c, false), nil
 }
 
 type TcpDialerFactory struct{}

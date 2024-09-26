@@ -10,9 +10,11 @@ package limiter
 
 import "io"
 
+var _ io.Writer = (*LimitWriter)(nil)
+
 type LimitWriter struct {
 	writer io.Writer
-	*baseWaiter
+	waiter
 }
 
 func (w *LimitWriter) Write(buf []byte) (int, error) {
@@ -34,7 +36,7 @@ func (w *LimitWriter) Write(buf []byte) (int, error) {
 		if toWrite > len(buf)-written {
 			toWrite = len(buf) - written
 		}
-		w.take(toWrite)
+		w.Take(toWrite)
 		n, err := w.writer.Write(buf[written : written+toWrite])
 		written += n
 		if err != nil {

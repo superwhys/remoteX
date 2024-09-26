@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/url"
-	
+
 	"github.com/pkg/errors"
 	"golang.org/x/net/proxy"
 )
@@ -21,7 +21,7 @@ func DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	if !ok {
 		return nil, errUnexpectedInterfaceType
 	}
-	
+
 	return dialer.DialContext(ctx, network, addr)
 }
 

@@ -6,9 +6,10 @@ import (
 	"net"
 	"net/url"
 	"time"
-	
+
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/superwhys/remoteX/domain/connection"
+	connPkg "github.com/superwhys/remoteX/pkg/connection"
 	"github.com/superwhys/remoteX/pkg/protocol"
 	"github.com/superwhys/remoteX/pkg/tlsutils"
 )
@@ -28,28 +29,28 @@ type TcpListener struct {
 func (t *TcpListener) Listen(ctx context.Context, connections chan<- connection.TlsConn) error {
 	local := t.local
 	tlsConf := t.tlsConf
-	
+
 	tcpAddr, err := net.ResolveTCPAddr(local.Scheme, local.Host)
 	if err != nil {
 		plog.Errorc(ctx, "Resolve tcp addr error: %v", err)
 		return err
 	}
-	
+
 	lisConf := net.ListenConfig{}
-	
+
 	listener, err := lisConf.Listen(ctx, local.Scheme, tcpAddr.String())
 	if err != nil {
 		plog.Errorc(ctx, "Listen tcp addr error: %v", err)
 		return err
 	}
 	defer listener.Close()
-	
+
 	plog.Infoc(ctx, "TCP listener (%v) starting", tcpAddr)
 	defer plog.Infoc(ctx, "TCP listener (%v) shutting down", tcpAddr)
-	
+
 	acceptFailures := 0
 	const maxAcceptFailures = 10
-	
+
 	tcpListener := listener.(*net.TCPListener)
 	for {
 		_ = tcpListener.SetDeadline(time.Now().Add(time.Second))
@@ -62,40 +63,48 @@ func (t *TcpListener) Listen(ctx context.Context, connections chan<- connection.
 			return nil
 		default:
 		}
-		
+
 		if err != nil {
 			if err, ok := err.(*net.OpError); !ok || !err.Timeout() {
 				plog.Warnc(ctx, "Listen Tcp Accepting connection error:", err)
-				
+
 				acceptFailures++
 				if acceptFailures > maxAcceptFailures {
 					return err
 				}
-				
+
 				time.Sleep(time.Duration(acceptFailures) * time.Second)
 			}
 			continue
 		}
-		
+
 		acceptFailures = 0
 		plog.Debugc(ctx, "Listen TCP: connect from %v", conn.RemoteAddr())
-		
+
+		if err := connPkg.SetTcpOptions(conn); err != nil {
+			plog.Errorc(ctx, "SetTcpOptions error: %v", err)
+			conn.Close()
+			return err
+		}
 		tc := tls.Server(conn, tlsConf)
 		if err := tlsutils.TlsTimedHandshake(tc); err != nil {
 			plog.Errorc(ctx, "Listen TCP TLS handshake error: %v", err)
 			tc.Close()
 			continue
 		}
-		
+
+		sc := connPkg.NewTcpConnectionServer(tc)
 		c := &connection.Connection{
 			ConnectionId:  connection.GenerateConnectionID(tlsutils.LocalHost(tc), tlsutils.RemoteHost(tc)),
+			LocalAddress:  tc.LocalAddr().String(),
+			RemoteAddress: tc.RemoteAddr().String(),
 			Protocol:      protocol.ConnectionProtocolTcp,
 			ConnectType:   protocol.ConnectionTypeServer,
 			Status:        protocol.ConnectionStatusBeforeAuth,
 			StartTime:     time.Now().Unix(),
 			LastHeartbeat: time.Now().Unix(),
 		}
-		ic := connection.NewInternalConn(tc, c)
+		ic := connection.NewInternalConnection(sc, c, true)
 		connections <- ic
 	}
 }
@@ -107,6 +116,6 @@ func (t *TcpListenerFactory) New(local *url.URL, tlsConf *tls.Config) connection
 		local:   local,
 		tlsConf: tlsConf,
 	}
-	
+
 	return l
 }

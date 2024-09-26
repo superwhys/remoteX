@@ -14,6 +14,6 @@ func (n NodeID) String() string {
 func NewNodeID(rawCert []byte) NodeID {
 	hash := sha256.New()
 	hash.Write(rawCert)
-	
+
 	return NodeID(hex.EncodeToString(hash.Sum(nil)))
 }

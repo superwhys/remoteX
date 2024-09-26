@@ -13,7 +13,7 @@ import (
 	"crypto/rand"
 	"io"
 	"testing"
-
+	
 	"golang.org/x/time/rate"
 )
 
@@ -22,19 +22,21 @@ func TestLimitWriterWrite(t *testing.T) {
 	if _, err := rand.Reader.Read(src); err != nil {
 		t.Fatal(err)
 	}
-
+	
 	dst := new(bytes.Buffer)
 	cw := &countingWriter{w: dst}
 	lw := &LimitWriter{
-		writer:     cw,
-		baseWaiter: (*baseWaiter)(rate.NewLimiter(rate.Limit(42), limiterBurstSize)),
+		writer: cw,
+		waiter: &BaseWaiter{
+			Limiter: rate.NewLimiter(rate.Limit(42), limiterBurstSize),
+		},
 	}
 	if _, err := io.Copy(lw, bytes.NewReader(src)); err != nil {
 		t.Fatal(err)
 	}
-
+	
 	t.Logf("write count: %d", len(src))
-
+	
 	// 限流器每秒允许 42 K
 	// 根据 LimitWriter 单次写入计算, 一次写入大小为1024K
 	// 因此要写入12.5 * 8192 字节，即 102400 字节的数据

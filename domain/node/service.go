@@ -2,27 +2,35 @@ package node
 
 import (
 	"errors"
+	"sync"
 	"time"
 	
 	"github.com/superwhys/remoteX/pkg/common"
 	"github.com/superwhys/remoteX/pkg/errorutils"
+	"github.com/superwhys/remoteX/pkg/osutils"
 )
 
 type Service interface {
 	RegisterNode(n *Node) error
 	GetNode(nodeId common.NodeID) (*Node, error)
-	UpdateNodeStatus(nodeId common.NodeID, status NodeStatus) error
+	GetLocal() *Node
+	RefreshCurrentNode() (*Node, error)
 	GetNodeStatus(nodeId common.NodeID) (NodeStatus, error)
+	UpdateNodeStatus(nodeId common.NodeID, status NodeStatus) error
 	UpdateHeartbeat(nodeId common.NodeID) error
 }
 
 type ServiceImpl struct {
-	nodes map[common.NodeID]*Node
+	localNode *Node
+	rl        *sync.RWMutex
+	nodes     map[common.NodeID]*Node
 }
 
-func NewNodeService() *ServiceImpl {
+func NewNodeService(local *Node) *ServiceImpl {
 	return &ServiceImpl{
-		nodes: make(map[common.NodeID]*Node),
+		localNode: local,
+		rl:        &sync.RWMutex{},
+		nodes:     make(map[common.NodeID]*Node),
 	}
 }
 
@@ -46,6 +54,30 @@ func (ds *ServiceImpl) GetNode(nodeId common.NodeID) (*Node, error) {
 	}
 	
 	return node, nil
+}
+
+func (ds *ServiceImpl) GetLocal() *Node {
+	ds.rl.RLock()
+	defer ds.rl.RUnlock()
+	
+	return ds.localNode
+}
+
+func (ds *ServiceImpl) RefreshCurrentNode() (*Node, error) {
+	ds.rl.RLock()
+	currentNode := ds.localNode
+	ds.rl.RUnlock()
+	
+	os, arch := osutils.GetOsArch()
+	currentNode.Configuration.Os = GetOsName(os)
+	currentNode.Configuration.Arch = GetArch(arch)
+	currentNode.LastHeartbeat = time.Now().Unix()
+	
+	ds.rl.Lock()
+	defer ds.rl.Unlock()
+	
+	ds.localNode = currentNode
+	return currentNode, nil
 }
 
 func (ds *ServiceImpl) UpdateNodeStatus(nodeId common.NodeID, status NodeStatus) error {

@@ -12,7 +12,7 @@ var (
 )
 
 type GenericListener interface {
-	Listen(ctx context.Context, conns chan<- TlsConn) error
+	Listen(ctx context.Context, connCh chan<- TlsConn) error
 }
 
 type ListenerFactory interface {
@@ -28,6 +28,6 @@ func GetListenerFactory(uri *url.URL) (ListenerFactory, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown address scheme %q", uri.Scheme)
 	}
-	
+
 	return dialerFactory, nil
 }

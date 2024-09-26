@@ -19,7 +19,7 @@ type Option struct {
 
 func InitOption(conf *config.Config) (opt *Option, err error) {
 	opt = &Option{Conf: conf}
-	opt.Cert, err = certutils.LoadOrGenerateCertificate(&conf.Tls)
+	opt.Cert, err = certutils.LoadOrGenerateCertificate(conf.Tls)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func InitOption(conf *config.Config) (opt *Option, err error) {
 		SessionTicketsDisabled: true,
 	}
 	
-	opt.Local = &conf.LocalNode
+	opt.Local = conf.LocalNode
 	opt.Local.NodeId = common.NewNodeID(opt.Cert.Certificate[0])
 	opt.Local.Status = node.NodeStatusOnline
 	return

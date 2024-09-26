@@ -10,8 +10,7 @@ package errorutils
 
 import (
 	"fmt"
-	
-	"github.com/superwhys/remoteX/domain/connection"
+
 	"github.com/superwhys/remoteX/pkg/common"
 )
 
@@ -20,16 +19,16 @@ type ConnectionError struct {
 	connectionId string
 }
 
-func ErrConnection(conn connection.TlsConn, opts ...ErrOption) *ConnectionError {
+func ErrConnection(connId string, opts ...ErrOption) *ConnectionError {
 	e := &ConnectionError{
 		BaseError:    &BaseError{},
-		connectionId: conn.String(),
+		connectionId: connId,
 	}
-	
+
 	for _, opt := range opts {
 		opt(e.BaseError)
 	}
-	
+
 	return e
 }
 
@@ -46,13 +45,23 @@ type ConnectToMyselfError struct {
 	remoteId common.NodeID
 }
 
-func ErrConnectToMyself(remoteId common.NodeID, conn connection.TlsConn) *ConnectToMyselfError {
+func ErrConnectToMyself(remoteId common.NodeID, connId string) *ConnectToMyselfError {
 	return &ConnectToMyselfError{
-		ConnectionError: ErrConnection(conn),
+		ConnectionError: ErrConnection(connId),
 		remoteId:        remoteId,
 	}
 }
 
 func (err *ConnectToMyselfError) Error() string {
 	return fmt.Sprintf("connected to myself (%s) at %s", err.remoteId, err.connectionId)
+}
+
+type ConnectNotFoundError struct {
+	*ConnectionError
+}
+
+func ErrConnectNotFound(connectionId string) *ConnectNotFoundError {
+	return &ConnectNotFoundError{
+		ConnectionError: &ConnectionError{connectionId: connectionId},
+	}
 }

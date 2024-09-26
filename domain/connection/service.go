@@ -4,11 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"net/url"
-	
-	"github.com/gogo/protobuf/proto"
+
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/pkg/common"
-	errors2 "github.com/superwhys/remoteX/pkg/errorutils"
+	"github.com/superwhys/remoteX/pkg/errorutils"
 	"github.com/superwhys/remoteX/pkg/protocol"
 )
 
@@ -20,10 +19,12 @@ type Service interface {
 	// CreateListener will create corresponding Listeners based on the configuration of the Node
 	// and listen for connections from other Nodes in a separate coroutine
 	// and then transmit the TlsConn to the outer layer through a channel
-	CreateListener(ctx context.Context, conns chan<- TlsConn) error
+	CreateListener(ctx context.Context, connCh chan<- TlsConn) error
 	// EstablishConnection will create a connection with target Node in the role of a client
 	EstablishConnection(ctx context.Context, target *url.URL) (TlsConn, error)
 	CheckConnection(conn TlsConn) error
+	RegisterConnection(conn TlsConn)
+	GetConnection(connId string) (TlsConn, error)
 	CloseConnection(connId string) error
 }
 
@@ -44,14 +45,14 @@ func NewConnectionService(local *url.URL, tlsConf *tls.Config) Service {
 	}
 }
 
-func (s *ServiceImpl) CreateListener(ctx context.Context, conns chan<- TlsConn) error {
+func (s *ServiceImpl) CreateListener(ctx context.Context, connCh chan<- TlsConn) error {
 	creator, err := GetListenerFactory(s.local)
 	if err != nil {
 		return err
 	}
 	lis := creator.New(s.local, s.tlsConf)
-	
-	return lis.Listen(ctx, conns)
+
+	return lis.Listen(ctx, connCh)
 }
 
 func (s *ServiceImpl) EstablishConnection(ctx context.Context, target *url.URL) (TlsConn, error) {
@@ -59,49 +60,49 @@ func (s *ServiceImpl) EstablishConnection(ctx context.Context, target *url.URL) 
 	if err != nil {
 		return nil, err
 	}
-	
-	tlsConn, err := dialFactory.New(s.local, s.tlsConf).Dial(ctx, target)
+
+	streamConn, err := dialFactory.New(s.local, s.tlsConf).Dial(ctx, target)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to establish connection to %v", target)
 	}
-	
-	connectionId := GenerateConnectionID(s.local.Host, target.Host)
-	s.connections[connectionId] = tlsConn
-	
-	return tlsConn, nil
+
+	return streamConn, nil
 }
 
 func (s *ServiceImpl) CheckConnection(conn TlsConn) error {
 	cs := conn.ConnectionState()
 	certs := cs.PeerCertificates
 	if cl := len(certs); cl != 1 {
-		return errors2.ErrConnection(conn, errors2.WithMsg("peer certificate invalidate"))
+		return errorutils.ErrConnection(conn.GetConnectionId(), errorutils.WithMsg("peer certificate invalidate"))
 	}
+
 	remoteCert := certs[0]
 	remoteID := common.NewNodeID(remoteCert.Raw)
 	if remoteID.String() == s.localNodeId {
-		return errors2.ErrConnectToMyself(remoteID, conn)
+		return errorutils.ErrConnectToMyself(remoteID, conn.GetConnectionId())
 	}
-	
+
 	return nil
+}
+
+func (s *ServiceImpl) RegisterConnection(conn TlsConn) {
+	s.connections[conn.GetConnectionId()] = conn
+}
+
+func (s *ServiceImpl) GetConnection(connId string) (TlsConn, error) {
+	conn, ok := s.connections[connId]
+	if !ok {
+		return nil, errorutils.ErrConnectNotFound(connId)
+	}
+	return conn, nil
 }
 
 func (s *ServiceImpl) CloseConnection(connId string) error {
 	conn, ok := s.connections[connId]
 	if !ok {
-		return errors.New("连接未找到")
+		return errorutils.ErrConnectNotFound(connId)
 	}
 	conn.SetStatus(protocol.ConnectionStatusDisconnected)
 	delete(s.connections, connId)
 	return conn.Close()
-}
-
-func (s *ServiceImpl) SendMessage(connId string, message proto.Message) error {
-	conn, ok := s.connections[connId]
-	if !ok {
-		return errors.New("连接未找到")
-	}
-	
-	conn.UpdateLastHeartbeat()
-	return conn.WriteMessage(message)
 }

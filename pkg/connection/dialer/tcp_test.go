@@ -12,7 +12,7 @@ import (
 	"context"
 	"crypto/tls"
 	"testing"
-
+	
 	"github.com/stretchr/testify/assert"
 	"github.com/superwhys/remoteX/config"
 	"github.com/superwhys/remoteX/domain/connection"
@@ -33,12 +33,12 @@ func TestTcpDialer(t *testing.T) {
 				Schema:    "tcp",
 			},
 		}
-
+		
 		cert, err := certutils.LoadOrGenerateCertificate(&config.TlsConfig{
 			CertFile: "/Users/yong/.ssh/cert.pem",
 			KeyFile:  "/Users/yong/.ssh/key.pem",
 		})
-
+		
 		assert.Nil(t, err)
 		tlsConf := &tls.Config{
 			ServerName:             "remoteX",
@@ -49,7 +49,7 @@ func TestTcpDialer(t *testing.T) {
 			SessionTicketsDisabled: true,
 		}
 		local.NodeId = common.NewNodeID(cert.Certificate[0])
-
+		
 		target := &node.Node{
 			Name: "testDialTarget",
 			Address: protocol.Address{
@@ -62,12 +62,14 @@ func TestTcpDialer(t *testing.T) {
 		assert.Nil(t, err)
 		tc, err := fac.New(local.URL(), tlsConf).Dial(context.Background(), target.URL())
 		assert.Nil(t, err)
-
-		err = tc.WriteMessage(local)
+		
+		s, err := tc.OpenStream()
 		assert.Nil(t, err)
-
+		err = s.WriteMessage(local)
+		assert.Nil(t, err)
+		
 		remote := new(node.Node)
-		err = tc.ReadMessage(remote)
+		err = s.ReadMessage(remote)
 		assert.Nil(t, err)
 		t.Log(remote)
 	})

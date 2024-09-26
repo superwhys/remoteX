@@ -32,8 +32,8 @@ message NodeConfiguration {
 }
 
 message NodeTransConfiguration {
-  int32 max_send_kbps = 1;
-  int32 max_recv_kbps = 2;
+  int32 max_send_kbps = 1 [(ext.yaml) = "max_send_kbps"];
+  int32 max_recv_kbps = 2 [(ext.yaml) = "max_recv_kbps"];
 }
 
 message Node {

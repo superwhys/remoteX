@@ -12,8 +12,7 @@ import (
 	"io"
 	"sync"
 	
-	"github.com/superwhys/remoteX/domain/node"
-	"golang.org/x/time/rate"
+	"github.com/superwhys/remoteX/pkg/common"
 )
 
 const (
@@ -22,71 +21,54 @@ const (
 )
 
 type Limiter struct {
-	myID                node.NodeID
-	mu                  sync.Mutex
-	write               *rate.Limiter
-	read                *rate.Limiter
-	deviceReadLimiters  map[node.NodeID]*rate.Limiter
-	deviceWriteLimiters map[node.NodeID]*rate.Limiter
+	myID             common.NodeID
+	mu               sync.Mutex
+	writerWaiter     waiter
+	readerWaiter     waiter
+	maxRecv, maxSend int
 }
 
-func NewLimiter(myID node.NodeID) *Limiter {
-	return &Limiter{
-		myID:                myID,
-		mu:                  sync.Mutex{},
-		write:               rate.NewLimiter(rate.Inf, limiterBurstSize),
-		read:                rate.NewLimiter(rate.Inf, limiterBurstSize),
-		deviceReadLimiters:  make(map[node.NodeID]*rate.Limiter),
-		deviceWriteLimiters: make(map[node.NodeID]*rate.Limiter),
-	}
-}
-
-func (l *Limiter) SetLimiter(device node.DeviceConfiguration) {
-	readLimiter := l.getReadLimiterLocked(device.DeviceId)
-	writeLimiter := l.getWriteLimiterLocked(device.DeviceId)
-	
-	readLimit := rate.Limit(device.MaxRecvKbps) * 1024
-	writeLimit := rate.Limit(device.MaxSendKbps) * 1024
-	if readLimit <= 0 {
-		readLimit = rate.Inf
-	}
-	if writeLimit <= 0 {
-		writeLimit = rate.Inf
+func NewLimiter(nodeId common.NodeID, maxRecv, maxSend int) *Limiter {
+	l := &Limiter{
+		myID:         nodeId,
+		mu:           sync.Mutex{},
+		readerWaiter: NewBaseWaiter(maxRecv),
+		writerWaiter: NewBaseWaiter(maxSend),
+		maxRecv:      maxRecv,
+		maxSend:      maxSend,
 	}
 	
-	readLimiter.SetLimit(readLimit)
-	writeLimiter.SetLimit(writeLimit)
+	return l
 }
 
-func (l *Limiter) getReadLimiterLocked(deviceId node.NodeID) *rate.Limiter {
-	return l.getRateLimiter(l.deviceReadLimiters, deviceId)
-}
-
-func (l *Limiter) getWriteLimiterLocked(deviceId node.NodeID) *rate.Limiter {
-	return l.getRateLimiter(l.deviceWriteLimiters, deviceId)
-}
-
-func (l *Limiter) getRateLimiter(m map[node.NodeID]*rate.Limiter, deviceId node.NodeID) *rate.Limiter {
-	limiter, ok := m[deviceId]
-	if !ok {
-		limiter = rate.NewLimiter(rate.Inf, limiterBurstSize)
-		m[deviceId] = limiter
-	}
-	return limiter
-}
-
-func (l *Limiter) newLimitReader(deviceId node.NodeID, r io.Reader) io.Reader {
+func (l *Limiter) newLimitReader(r io.Reader) *LimitReader {
 	return &LimitReader{
-		reader:     r,
-		baseWaiter: (*baseWaiter)(l.getReadLimiterLocked(deviceId)),
+		reader: r,
+		waiter: l.readerWaiter,
 	}
 }
 
-func (l *Limiter) getDeviceRateLimiter(deviceId node.NodeID, rw io.ReadWriter) (io.Reader, io.Writer) {
+func (l *Limiter) newLimitWriter(w io.Writer) *LimitWriter {
+	return &LimitWriter{
+		writer: w,
+		waiter: l.writerWaiter,
+	}
+}
+
+func (l *Limiter) GetNodeRateLimiter(rw io.ReadWriter) (*LimitReader, *LimitWriter) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	
-	r := l.newLimitReader(deviceId, rw)
+	r := l.newLimitReader(rw)
+	w := l.newLimitWriter(rw)
 	
-	return r, nil
+	return r, w
+}
+
+func (l *Limiter) UpdateLimit(maxRecv, maxSend int32) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	
+	l.readerWaiter.SetLimit(maxRecv)
+	l.readerWaiter.SetLimit(maxSend)
 }
