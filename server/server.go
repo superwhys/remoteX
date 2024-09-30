@@ -3,11 +3,9 @@ package server
 import (
 	"context"
 	"iter"
-	"slices"
 	"time"
 
 	"github.com/go-puzzles/puzzles/plog"
-	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/auth"
 	"github.com/superwhys/remoteX/domain/command"
@@ -52,7 +50,7 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 		connections:       make(chan connection.TlsConn),
 	}
 
-	server.nodeService.RegisterNode(opt.Local)
+	server.registerNode(opt.Local)
 
 	listener.InitListener()
 	dialer.InitDialer()
@@ -85,7 +83,7 @@ func (s *RemoteXServer) StartListener(ctx context.Context) error {
 }
 
 func (s *RemoteXServer) HandleConnection(ctx context.Context) error {
-	for remote, conn := range s.handleConnection(ctx) {
+	for remote, conn := range s.connectionPrepareIter(ctx) {
 		go func(remote *node.Node, conn connection.TlsConn) {
 			if err := s.registerNode(remote); err != nil {
 				plog.Errorf("register node: %v: %v", remote, err)
@@ -100,7 +98,7 @@ func (s *RemoteXServer) HandleConnection(ctx context.Context) error {
 	return nil
 }
 
-func (s *RemoteXServer) handleConnection(ctx context.Context) iter.Seq2[*node.Node, connection.TlsConn] {
+func (s *RemoteXServer) connectionPrepareIter(ctx context.Context) iter.Seq2[*node.Node, connection.TlsConn] {
 	return func(yield func(*node.Node, connection.TlsConn) bool) {
 		for {
 			var conn connection.TlsConn
@@ -109,10 +107,6 @@ func (s *RemoteXServer) handleConnection(ctx context.Context) iter.Seq2[*node.No
 				break
 			case conn = <-s.connections:
 			}
-			// set deadline for connection
-			// this setting will take effect in all subsequent connection operations
-			// all subsequent connections will be checked for timeout when performing Accept operations
-			// _ = conn.SetDeadline(time.Now().Add(2 * time.Second))
 
 			if err := s.connService.CheckConnection(conn); err != nil {
 				plog.Errorf("check connection err: %v", err)
@@ -136,46 +130,6 @@ func (s *RemoteXServer) handleConnection(ctx context.Context) iter.Seq2[*node.No
 	}
 }
 
-type exchangeDirection int
-
-const (
-	DirectionDial = iota
-	DirectionListen
-)
-
-// exchangeNodeMessage Used to exchange node information with other node
-// If the connection is initiated by the other party (DirectionListen)
-// We need to first read the node information sent by the other party.
-// If the connection was initiated by us, we need to send local node info first.
-func (s *RemoteXServer) exchangeNodeMessage(sc connection.Stream, direction exchangeDirection) (remote *node.Node, err error) {
-	remote = new(node.Node)
-
-	args := []*node.Node{remote, s.nodeService.GetLocal()}
-	fns := []func(message proto.Message) error{
-		sc.ReadMessage,
-		sc.WriteMessage,
-	}
-
-	var iterFn iter.Seq2[int, func(message proto.Message) error]
-	switch direction {
-	case DirectionDial:
-		iterFn = slices.Backward(fns)
-	case DirectionListen:
-		iterFn = slices.All(fns)
-	default:
-		return nil, errors.New("invalid direction")
-	}
-
-	for idx, fn := range iterFn {
-		arg := args[idx]
-		if err := fn(arg); err != nil {
-			return nil, err
-		}
-	}
-
-	return remote, nil
-}
-
 func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn, isServer bool) {
 	eg, ctx := errgroup.WithContext(ctx)
 
@@ -184,6 +138,8 @@ func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn,
 	eg.Go(func() error {
 		return s.schedulerHeartbeat(ctx, conn, hbStartNotify, isServer)
 	})
+
+	// must be called after heartbeat is start
 	eg.Go(func() error {
 		select {
 		case <-ctx.Done():
@@ -195,6 +151,8 @@ func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn,
 
 	if err := eg.Wait(); err != nil {
 		plog.Errorf("failed to run background connection: %v", err)
+		s.nodeService.UpdateNodeStatus(conn.GetNodeId(), node.NodeStatusOffline)
+		s.CloseConn(conn)
 	}
 }
 

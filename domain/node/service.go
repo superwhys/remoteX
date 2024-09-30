@@ -35,8 +35,9 @@ func NewNodeService(local *Node) *ServiceImpl {
 }
 
 func (ds *ServiceImpl) RegisterNode(n *Node) error {
-	if _, exists := ds.nodes[n.NodeId]; exists {
-		return errors.New("该设备已注册")
+	oldNode, _ := ds.nodes[n.NodeId]
+	if oldNode != nil && oldNode.CheckNodeOnline() {
+		return errors.New("Has a same online node")
 	}
 
 	addr := n.Address

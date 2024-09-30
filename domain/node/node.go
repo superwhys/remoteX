@@ -3,6 +3,7 @@ package node
 import (
 	"fmt"
 	"net/url"
+	"time"
 )
 
 func GetOsName(o string) NodeOS {
@@ -35,6 +36,16 @@ func (m *Node) URL() *url.URL {
 
 func (m *Node) Host() string {
 	return fmt.Sprintf("%s://%s:%d", m.Address.Schema, m.Address.IpAddress, m.Address.Port)
+}
+
+func (m *Node) CheckHeartbeatAlive() bool {
+	now := time.Now().Unix()
+
+	return now-m.GetLastHeartbeat() > int64(time.Second*20)
+}
+
+func (m *Node) CheckNodeOnline() bool {
+	return m.Status == NodeStatusOnline && m.CheckHeartbeatAlive()
 }
 
 func (m *NodeTransConfiguration) SetDefault() {
