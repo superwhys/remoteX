@@ -12,6 +12,7 @@ import (
 type Service interface {
 	RegisterNode(n *Node) error
 	GetNode(nodeId common.NodeID) (*Node, error)
+	GetNodes() ([]*Node, error)
 	GetLocal() *Node
 	RefreshCurrentNode() (*Node, error)
 	GetNodeStatus(nodeId common.NodeID) (NodeStatus, error)
@@ -54,6 +55,18 @@ func (ds *ServiceImpl) GetNode(nodeId common.NodeID) (*Node, error) {
 	}
 
 	return node, nil
+}
+
+func (ds *ServiceImpl) GetNodes() ([]*Node, error) {
+	ds.rl.RLock()
+	defer ds.rl.RUnlock()
+
+	nodes := make([]*Node, 0, len(ds.nodes))
+	for _, n := range ds.nodes {
+		nodes = append(nodes, n)
+	}
+
+	return nodes, nil
 }
 
 func (ds *ServiceImpl) GetLocal() *Node {
