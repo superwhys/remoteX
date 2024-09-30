@@ -1,7 +1,6 @@
 package node
 
 import (
-	"errors"
 	"sync"
 	"time"
 
@@ -37,12 +36,12 @@ func NewNodeService(local *Node) *ServiceImpl {
 func (ds *ServiceImpl) RegisterNode(n *Node) error {
 	oldNode, _ := ds.nodes[n.NodeId]
 	if oldNode != nil && oldNode.CheckNodeOnline() {
-		return errors.New("Has a same online node")
+		return errorutils.ErrNode(n.NodeId, errorutils.WithMsg("Has a same online node"))
 	}
 
 	addr := n.Address
 	if addr.IpAddress == "" || addr.Port == 0 {
-		return errors.New("无效的设备信息: 缺少 IP 地址或端口")
+		return errorutils.ErrNode(n.NodeId, errorutils.WithMsg("missing addr or port"))
 	}
 	ds.nodes[n.NodeId] = n
 	return nil
@@ -84,7 +83,7 @@ func (ds *ServiceImpl) RefreshCurrentNode() (*Node, error) {
 func (ds *ServiceImpl) UpdateNodeStatus(nodeId common.NodeID, status NodeStatus) error {
 	n, ok := ds.nodes[nodeId]
 	if !ok {
-		return errors.New("设备未找到")
+		return errorutils.ErrNodeNotFound(nodeId)
 	}
 	n.Status = status
 	return nil
@@ -93,7 +92,7 @@ func (ds *ServiceImpl) UpdateNodeStatus(nodeId common.NodeID, status NodeStatus)
 func (ds *ServiceImpl) GetNodeStatus(nodeId common.NodeID) (NodeStatus, error) {
 	n, ok := ds.nodes[nodeId]
 	if !ok {
-		return NodeStatus(0), errors.New("设备未找到")
+		return NodeStatus(0), errorutils.ErrNodeNotFound(nodeId)
 	}
 	return n.Status, nil
 }
@@ -101,7 +100,7 @@ func (ds *ServiceImpl) GetNodeStatus(nodeId common.NodeID) (NodeStatus, error) {
 func (ds *ServiceImpl) UpdateHeartbeat(nodeId common.NodeID) error {
 	n, ok := ds.nodes[nodeId]
 	if !ok {
-		return errors.New("设备未找到")
+		return errorutils.ErrNodeNotFound(nodeId)
 	}
 	n.LastHeartbeat = time.Now().Unix()
 	return nil

@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"net/url"
 
-	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/pkg/common"
 	"github.com/superwhys/remoteX/pkg/errorutils"
 	"github.com/superwhys/remoteX/pkg/protocol"
@@ -48,7 +47,7 @@ func NewConnectionService(local *url.URL, tlsConf *tls.Config) Service {
 func (s *ServiceImpl) CreateListener(ctx context.Context, connCh chan<- TlsConn) error {
 	creator, err := GetListenerFactory(s.local)
 	if err != nil {
-		return err
+		return errorutils.ErrConnection("", errorutils.WithError(err))
 	}
 	lis := creator.New(s.local, s.tlsConf)
 
@@ -58,12 +57,16 @@ func (s *ServiceImpl) CreateListener(ctx context.Context, connCh chan<- TlsConn)
 func (s *ServiceImpl) EstablishConnection(ctx context.Context, target *url.URL) (TlsConn, error) {
 	dialFactory, err := GetDialerFactory(target)
 	if err != nil {
-		return nil, err
+		return nil, errorutils.ErrConnection("", errorutils.WithError(err))
 	}
 
 	streamConn, err := dialFactory.New(s.local, s.tlsConf).Dial(ctx, target)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to establish connection to %v", target)
+		return nil, errorutils.ErrConnection(
+			"",
+			errorutils.WithError(err),
+			errorutils.WithMsg("failed to establish connection"),
+		)
 	}
 
 	return streamConn, nil

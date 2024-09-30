@@ -2,7 +2,7 @@ package errorutils
 
 import (
 	"fmt"
-	
+
 	"github.com/superwhys/remoteX/pkg/common"
 )
 
@@ -16,11 +16,11 @@ func ErrNode(nodeId common.NodeID, opts ...ErrOption) *NodeError {
 		BaseError: &BaseError{},
 		nodeId:    nodeId,
 	}
-	
+
 	for _, opt := range opts {
 		opt(ne.BaseError)
 	}
-	
+
 	return ne
 }
 
