@@ -11,5 +11,6 @@ package command
 func EmptyCommand() *Command {
 	return &Command{
 		Type: Empty,
+		Args: []string{"empty"},
 	}
 }

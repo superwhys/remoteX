@@ -10,13 +10,13 @@ import (
 	"github.com/superwhys/remoteX/domain/node"
 )
 
-func (s *RemoteXServer) schedulerHeartbeat(ctx context.Context, conn connection.TlsConn, hbStartNotify chan struct{}, isServer bool) error {
+func (s *RemoteXServer) schedulerHeartbeat(ctx context.Context, conn connection.TlsConn, hbStartNotify chan struct{}) error {
 	var (
 		streamGetter func() (connection.Stream, error)
 		handler      func(stream connection.Stream) error
 	)
 
-	switch isServer {
+	switch conn.IsServer() {
 	case true:
 		streamGetter = conn.AcceptStream
 		handler = s.receiveHeartbeat

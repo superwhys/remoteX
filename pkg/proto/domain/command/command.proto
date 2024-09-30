@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package command;
 
+import "ext.proto";
+
 enum CommandType {
   // EMPTY is the type of command sent during connection establishment
   EMPTY = 0;
@@ -16,4 +18,11 @@ message Command {
   CommandType type = 1;
   repeated string args = 2;
   repeated CommandParam params = 3;
+}
+
+message Ret {
+  Command command = 1 [(ext.nullable) = true];
+  map<string, string> resp = 2;
+  uint64 err_no = 3;
+  string err_msg = 4;
 }

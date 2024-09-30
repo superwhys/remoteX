@@ -55,6 +55,7 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 	listener.InitListener()
 	dialer.InitDialer()
 
+	// TODO: retry while server was down
 	go server.StartDialer(context.Background())
 
 	server.Add(svcutils.AsService(server.StartListener, "startListener"))
@@ -92,7 +93,7 @@ func (s *RemoteXServer) HandleConnection(ctx context.Context) error {
 			s.registerConnection(conn)
 			plog.Debugf("register connection: %v. NodeId: %v", conn.GetConnectionId(), conn.GetNodeId())
 
-			s.background(ctx, conn, conn.IsServer())
+			s.background(ctx, conn)
 		}(remote, conn)
 	}
 	return nil
@@ -130,13 +131,13 @@ func (s *RemoteXServer) connectionPrepareIter(ctx context.Context) iter.Seq2[*no
 	}
 }
 
-func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn, isServer bool) {
+func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn) {
 	eg, ctx := errgroup.WithContext(ctx)
 
 	hbStartNotify := make(chan struct{})
 
 	eg.Go(func() error {
-		return s.schedulerHeartbeat(ctx, conn, hbStartNotify, isServer)
+		return s.schedulerHeartbeat(ctx, conn, hbStartNotify)
 	})
 
 	// must be called after heartbeat is start
@@ -145,6 +146,7 @@ func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn,
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-hbStartNotify:
+			plog.Debugf("conn{%s} start command handler", conn.GetConnectionId())
 			return s.schedulerCommand(ctx, conn)
 		}
 	})

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/go-puzzles/puzzles/plog"
@@ -43,12 +44,28 @@ func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.Tl
 	}
 }
 
-func (s *RemoteXServer) handleStream(_ context.Context, stream connection.Stream) error {
-	command := &command.Command{}
-	if err := stream.ReadMessage(command); err != nil {
+func (s *RemoteXServer) handleStream(ctx context.Context, stream connection.Stream) error {
+	cmd := &command.Command{}
+	if err := stream.ReadMessage(cmd); err != nil {
 		return errors.Wrap(err, "readMessage")
 	}
 
-	plog.Infof("received command: %v", command)
+	plog.Debugf("received command: %v", cmd)
+
+	resp, err := s.commandService.DoCommand(ctx, cmd)
+	if err != nil {
+		if resp == nil {
+			resp = &command.Ret{}
+		}
+
+		if resp.ErrMsg == "" {
+			resp.ErrMsg = fmt.Sprintf("handle command failed: %v", err)
+		}
+	}
+
+	if err := stream.WriteMessage(resp); err != nil {
+		return errors.Wrap(err, "writeMessage")
+	}
+
 	return nil
 }
