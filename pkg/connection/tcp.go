@@ -17,34 +17,37 @@ var _ connection.StreamConnection = (*TcpConnection)(nil)
 type TcpConnection struct {
 	session *smux.Session
 	rawConn *tls.Conn
+	connId  string
 }
 
 func (c *TcpConnection) ConnectionState() tls.ConnectionState {
 	return c.rawConn.ConnectionState()
 }
 
-func NewTcpConnectionServer(conn *tls.Conn) *TcpConnection {
+func NewTcpConnectionServer(connId string, conn *tls.Conn) (*TcpConnection, error) {
 	session, err := smux.Server(conn, nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return &TcpConnection{
 		session: session,
 		rawConn: conn,
-	}
+		connId:  connId,
+	}, nil
 }
 
-func NewTcpConnectionClient(conn *tls.Conn) *TcpConnection {
+func NewTcpConnectionClient(connId string, conn *tls.Conn) (*TcpConnection, error) {
 	session, err := smux.Client(conn, nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return &TcpConnection{
 		session: session,
 		rawConn: conn,
-	}
+		connId:  connId,
+	}, nil
 }
 
 func (c *TcpConnection) RemoteAddr() net.Addr {
@@ -73,7 +76,7 @@ func (c *TcpConnection) AcceptStream() (connection.Stream, error) {
 		return nil, err
 	}
 
-	return NewTcpStream(s), nil
+	return NewTcpStream(c.connId, s), nil
 }
 
 func (c *TcpConnection) OpenStream() (connection.Stream, error) {
@@ -82,7 +85,7 @@ func (c *TcpConnection) OpenStream() (connection.Stream, error) {
 		return nil, err
 	}
 
-	return NewTcpStream(s), nil
+	return NewTcpStream(c.connId, s), nil
 }
 
 func (c *TcpConnection) Close() error {
@@ -95,16 +98,18 @@ var _ connection.Stream = (*TcpStream)(nil)
 type TcpStream struct {
 	*smux.Stream
 
-	pr     *protoutils.ProtoReader
-	pw     *protoutils.ProtoWriter
-	nodeId common.NodeID
+	pr           *protoutils.ProtoReader
+	pw           *protoutils.ProtoWriter
+	nodeId       common.NodeID
+	connectionId string
 }
 
-func NewTcpStream(stream *smux.Stream) *TcpStream {
+func NewTcpStream(connId string, stream *smux.Stream) *TcpStream {
 	return &TcpStream{
-		Stream: stream,
-		pr:     protoutils.NewProtoReader(stream),
-		pw:     protoutils.NewProtoWriter(stream),
+		Stream:       stream,
+		pr:           protoutils.NewProtoReader(stream),
+		pw:           protoutils.NewProtoWriter(stream),
+		connectionId: connId,
 	}
 }
 
@@ -114,6 +119,10 @@ func (t *TcpStream) ReadMessage(message proto.Message) error {
 
 func (t *TcpStream) WriteMessage(m proto.Message) error {
 	return t.pw.WriteMessage(m)
+}
+
+func (t *TcpStream) GetConnectionId() string {
+	return t.connectionId
 }
 
 func (t *TcpStream) GetNodeId() common.NodeID {

@@ -68,7 +68,7 @@ func (t *TcpListener) Listen(ctx context.Context, connections chan<- connection.
 		if err != nil {
 			opErr := new(net.OpError)
 			if errors.As(err, &opErr) && !opErr.Timeout() {
-				plog.Warnc(ctx, "Listen Tcp Accepting connection error:", err)
+				plog.Warnf("Listen Tcp Accepting connection error:", err)
 
 				acceptFailures++
 				if acceptFailures > maxAcceptFailures {
@@ -82,23 +82,30 @@ func (t *TcpListener) Listen(ctx context.Context, connections chan<- connection.
 		}
 
 		acceptFailures = 0
-		plog.Debugc(ctx, "Listen TCP: connect from %v", conn.RemoteAddr())
+		plog.Debugf("Listen TCP: connect from %v", conn.RemoteAddr())
 
 		if err := connPkg.SetTcpOptions(conn); err != nil {
-			plog.Errorc(ctx, "SetTcpOptions error: %v", err)
+			plog.Errorf("SetTcpOptions error: %v", err)
 			conn.Close()
 			return err
 		}
 		tc := tls.Server(conn, tlsConf)
 		if err := tlsutils.TlsTimedHandshake(tc); err != nil {
-			plog.Errorc(ctx, "Listen TCP TLS handshake error: %v", err)
+			plog.Errorf("Listen TCP TLS handshake error: %v", err)
 			tc.Close()
 			continue
 		}
 
-		sc := connPkg.NewTcpConnectionServer(tc)
+		connId := connection.GenerateConnectionID(tlsutils.LocalHost(tc), tlsutils.RemoteHost(tc))
+		sc, err := connPkg.NewTcpConnectionServer(connId, tc)
+		if err != nil {
+			plog.Errorf("new tcp connection server error: %v", err)
+			tc.Close()
+			continue
+		}
+
 		c := &connection.Connection{
-			ConnectionId:  connection.GenerateConnectionID(tlsutils.LocalHost(tc), tlsutils.RemoteHost(tc)),
+			ConnectionId:  connId,
 			LocalAddress:  tc.LocalAddr().String(),
 			RemoteAddress: tc.RemoteAddr().String(),
 			Protocol:      protocol.ConnectionProtocolTcp,

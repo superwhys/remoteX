@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"net/url"
 	"time"
-	
+
 	"github.com/superwhys/remoteX/domain/connection"
 	connPkg "github.com/superwhys/remoteX/pkg/connection"
 	"github.com/superwhys/remoteX/pkg/protocol"
@@ -26,24 +26,30 @@ type tcpDialer struct {
 func (t *tcpDialer) Dial(ctx context.Context, target *url.URL) (connection.TlsConn, error) {
 	toCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
-	
+
 	conn, err := DialContext(toCtx, target.Scheme, target.Host)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if err := connPkg.SetTcpOptions(conn); err != nil {
 		return nil, err
 	}
-	
+
 	tc := tls.Client(conn, t.TlsConf)
 	if err = tlsutils.TlsTimedHandshake(tc); err != nil {
 		tc.Close()
 		return nil, err
 	}
-	
-	sc := connPkg.NewTcpConnectionClient(tc)
+
 	connId := connection.GenerateConnectionID(t.Local.Host, target.Host)
+
+	sc, err := connPkg.NewTcpConnectionClient(connId, tc)
+	if err != nil {
+		tc.Close()
+		return nil, err
+	}
+
 	c := &connection.Connection{
 		ConnectionId:  connId,
 		LocalAddress:  tc.LocalAddr().String(),
@@ -54,7 +60,7 @@ func (t *tcpDialer) Dial(ctx context.Context, target *url.URL) (connection.TlsCo
 		StartTime:     time.Now().Unix(),
 		LastHeartbeat: time.Now().Unix(),
 	}
-	
+
 	return connection.NewInternalConnection(sc, c, false), nil
 }
 

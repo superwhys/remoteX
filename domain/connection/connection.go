@@ -6,6 +6,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/go-puzzles/puzzles/plog"
 	"github.com/gogo/protobuf/proto"
 	"github.com/superwhys/remoteX/pkg/common"
 	"github.com/superwhys/remoteX/pkg/counter"
@@ -29,6 +30,7 @@ type Stream interface {
 	protoutils.ProtoMessageReader
 	protoutils.ProtoMessageWriter
 
+	GetConnectionId() string
 	GetNodeId() common.NodeID
 	SetNodeId(nodeId common.NodeID)
 }
@@ -181,9 +183,16 @@ func (cc *CounterStream) Write(p []byte) (n int, err error) {
 }
 
 func (cc *CounterStream) ReadMessage(message proto.Message) error {
+	defer func() {
+		plog.Debugf("conn{%s} stream read message bytes: %d", cc.GetConnectionId(), cc.rd.Tot())
+	}()
 	return cc.ProtoMessageReader.ReadMessage(message)
 }
 
 func (cc *CounterStream) WriteMessage(m proto.Message) error {
+	defer func() {
+		plog.Debugf("conn{%s} stream write message bytes: %d", cc.GetConnectionId(), cc.wr.Tot())
+	}()
+
 	return cc.ProtoMessageWriter.WriteMessage(m)
 }
