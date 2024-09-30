@@ -29,22 +29,24 @@ func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.Tl
 				continue
 			}
 
-			// pack limiter and counter
-			limitStream := connection.PackLimiterStream(stream, s.limiter)
-			counterStream := connection.PackCounterConnection(
-				stream,
-				&counter.CountingReader{Reader: limitStream},
-				&counter.CountingWriter{Writer: limitStream},
-			)
+			go func(stream connection.Stream) {
+				// pack limiter and counter
+				limitStream := connection.PackLimiterStream(stream, s.limiter)
+				counterStream := connection.PackCounterConnection(
+					stream,
+					&counter.CountingReader{Reader: limitStream},
+					&counter.CountingWriter{Writer: limitStream},
+				)
 
-			if err := s.handleStream(ctx, counterStream); err != nil {
-				return errors.Wrap(err, "handleStream")
-			}
+				if err := s.handleCommand(ctx, counterStream); err != nil {
+					plog.Errorf("handle command error: %v", err)
+				}
+			}(stream)
 		}
 	}
 }
 
-func (s *RemoteXServer) handleStream(ctx context.Context, stream connection.Stream) error {
+func (s *RemoteXServer) handleCommand(ctx context.Context, stream connection.Stream) error {
 	cmd := &command.Command{}
 	if err := stream.ReadMessage(cmd); err != nil {
 		return errors.Wrap(err, "readMessage")

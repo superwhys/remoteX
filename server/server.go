@@ -87,7 +87,8 @@ func (s *RemoteXServer) HandleConnection(ctx context.Context) error {
 	for remote, conn := range s.connectionPrepareIter(ctx) {
 		go func(remote *node.Node, conn connection.TlsConn) {
 			if err := s.registerNode(remote); err != nil {
-				plog.Errorf("register node: %v: %v", remote, err)
+				plog.Errorf("register node: %v error: %v", remote, err)
+				conn.Close()
 				return
 			}
 			s.registerConnection(conn)
