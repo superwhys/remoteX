@@ -12,7 +12,7 @@ import (
 //go:generate protoc -I .. -I . -I $GOPATH/src/github.com/gogo/protobuf/protobuf --gogofast_out=Mgoogle/protobuf/descriptor.proto=github.com/gogo/protobuf/protoc-gen-gogo/descriptor,paths=source_relative:ext ext.proto
 
 // Then build our vanity compiler that uses the new extensions
-//go:generate go build -o scripts/protoc-gen-filesync scripts/protoc_plugin.go
+//go:generate go build -o scripts/protoc-gen-remotex scripts/protoc_plugin.go
 
 //go:generate go run generate.go config pkg/protocol domain/node domain/connection
 
@@ -24,19 +24,19 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Println(path, "returned:", matches)
-		
+
 		args := []string{
 			"-I", "..",
 			"-I", ".",
 			"-I", fmt.Sprintf("%v/src/github.com/gogo/protobuf/protobuf", goPath),
-			"--plugin=protoc-gen-filesync=scripts/protoc-gen-filesync",
+			"--plugin=protoc-gen-filesync=scripts/protoc-gen-remotex",
 			"--filesync_out=paths=source_relative:../..",
 		}
 		args = append(args, matches...)
 		cmd := exec.Command("protoc", args...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		
+
 		if err := cmd.Run(); err != nil {
 			log.Fatal("Failed generating", path)
 		}

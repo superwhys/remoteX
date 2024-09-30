@@ -2,3 +2,4 @@
 *.pem
 content
 go.work*
+protoc-gen-remotex
