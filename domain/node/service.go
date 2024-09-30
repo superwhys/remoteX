@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 	"time"
-	
+
 	"github.com/superwhys/remoteX/pkg/common"
 	"github.com/superwhys/remoteX/pkg/errorutils"
 	"github.com/superwhys/remoteX/pkg/osutils"
@@ -38,7 +38,7 @@ func (ds *ServiceImpl) RegisterNode(n *Node) error {
 	if _, exists := ds.nodes[n.NodeId]; exists {
 		return errors.New("该设备已注册")
 	}
-	
+
 	addr := n.Address
 	if addr.IpAddress == "" || addr.Port == 0 {
 		return errors.New("无效的设备信息: 缺少 IP 地址或端口")
@@ -52,14 +52,14 @@ func (ds *ServiceImpl) GetNode(nodeId common.NodeID) (*Node, error) {
 	if !exists {
 		return nil, errorutils.ErrNodeNotFound(nodeId)
 	}
-	
+
 	return node, nil
 }
 
 func (ds *ServiceImpl) GetLocal() *Node {
 	ds.rl.RLock()
 	defer ds.rl.RUnlock()
-	
+
 	return ds.localNode
 }
 
@@ -67,15 +67,15 @@ func (ds *ServiceImpl) RefreshCurrentNode() (*Node, error) {
 	ds.rl.RLock()
 	currentNode := ds.localNode
 	ds.rl.RUnlock()
-	
+
 	os, arch := osutils.GetOsArch()
 	currentNode.Configuration.Os = GetOsName(os)
 	currentNode.Configuration.Arch = GetArch(arch)
 	currentNode.LastHeartbeat = time.Now().Unix()
-	
+
 	ds.rl.Lock()
 	defer ds.rl.Unlock()
-	
+
 	ds.localNode = currentNode
 	return currentNode, nil
 }

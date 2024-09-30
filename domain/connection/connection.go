@@ -22,11 +22,6 @@ type BaseConnection interface {
 	SetWriteDeadline(time.Time) error
 }
 
-type Listener interface {
-	io.Closer
-	Accept() (TlsConn, error)
-}
-
 type Stream interface {
 	io.ReadWriteCloser
 	BaseConnection

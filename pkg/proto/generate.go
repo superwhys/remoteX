@@ -14,7 +14,7 @@ import (
 // Then build our vanity compiler that uses the new extensions
 //go:generate go build -o scripts/protoc-gen-remotex scripts/protoc_plugin.go
 
-//go:generate go run generate.go config pkg/protocol domain/node domain/connection
+//go:generate go run generate.go config pkg/protocol domain/node domain/connection domain/command
 
 func main() {
 	goPath := os.Getenv("GOPATH")

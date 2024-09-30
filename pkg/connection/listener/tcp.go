@@ -3,6 +3,7 @@ package listener
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"net"
 	"net/url"
 	"time"
@@ -65,7 +66,8 @@ func (t *TcpListener) Listen(ctx context.Context, connections chan<- connection.
 		}
 
 		if err != nil {
-			if err, ok := err.(*net.OpError); !ok || !err.Timeout() {
+			opErr := new(net.OpError)
+			if errors.As(err, &opErr) && !opErr.Timeout() {
 				plog.Warnc(ctx, "Listen Tcp Accepting connection error:", err)
 
 				acceptFailures++
@@ -74,6 +76,7 @@ func (t *TcpListener) Listen(ctx context.Context, connections chan<- connection.
 				}
 
 				time.Sleep(time.Duration(acceptFailures) * time.Second)
+
 			}
 			continue
 		}

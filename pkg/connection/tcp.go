@@ -2,7 +2,6 @@ package connection
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"time"
 
@@ -57,7 +56,6 @@ func (c *TcpConnection) LocalAddr() net.Addr {
 }
 
 func (c *TcpConnection) SetDeadline(t time.Time) error {
-	fmt.Println("tcpConnSetDeadline")
 	return c.session.SetDeadline(t)
 }
 

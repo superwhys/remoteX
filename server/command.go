@@ -2,10 +2,11 @@ package server
 
 import (
 	"context"
-	"fmt"
-	
+	"net"
+
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
+	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/pkg/counter"
 )
@@ -19,9 +20,14 @@ func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.Tl
 		default:
 			stream, err := conn.AcceptStream()
 			if err != nil {
-				return errors.Wrap(err, "acceptStream")
+				opErr := new(net.OpError)
+				if errors.As(err, &opErr) && !opErr.Timeout() {
+					return errors.Wrap(err, "acceptStream")
+				}
+
+				continue
 			}
-			
+
 			// pack limiter and counter
 			limitStream := connection.PackLimiterStream(stream, s.limiter)
 			counterStream := connection.PackCounterConnection(
@@ -29,7 +35,7 @@ func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.Tl
 				&counter.CountingReader{Reader: limitStream},
 				&counter.CountingWriter{Writer: limitStream},
 			)
-			
+
 			if err := s.handleStream(ctx, counterStream); err != nil {
 				return errors.Wrap(err, "handleStream")
 			}
@@ -38,18 +44,11 @@ func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.Tl
 }
 
 func (s *RemoteXServer) handleStream(_ context.Context, stream connection.Stream) error {
-	buffer := make([]byte, 1024)
-	n, err := stream.Read(buffer)
-	if err != nil {
-		return errors.Wrap(err, "failed to read data")
+	command := &command.Command{}
+	if err := stream.ReadMessage(command); err != nil {
+		return errors.Wrap(err, "readMessage")
 	}
-	
-	plog.Infof("received data: %s", string(buffer[:n]))
-	
-	_, err = stream.Write([]byte(fmt.Sprintf("received: %s", string(buffer[:n]))))
-	if err != nil {
-		return errors.Wrap(err, "failed to write response")
-	}
-	
+
+	plog.Infof("received command: %v", command)
 	return nil
 }
