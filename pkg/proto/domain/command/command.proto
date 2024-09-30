@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package command;
+
+enum CommandType {
+  // EMPTY is the type of command sent during connection establishment
+  EMPTY = 0;
+}
+
+message CommandParam{
+  string key = 1;
+  string value = 2;
+}
+
+message Command {
+  CommandType type = 1;
+  repeated string args = 2;
+  repeated CommandParam params = 3;
+}
