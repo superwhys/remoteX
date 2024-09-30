@@ -35,8 +35,8 @@ github.com/go-logfmt/logfmt v0.3.0/go.mod h1:Qt1PoO58o5twSAckw1HlFXLmHsOX5/0LbT9
 github.com/go-logfmt/logfmt v0.4.0/go.mod h1:3RMwSq7FuexP4Kalkev3ejPJsZTpXXBr9+V4qmtdjCk=
 github.com/go-logfmt/logfmt v0.6.0 h1:wGYYu3uicYdqXVgoYbvnkrPVXkuLM1p1ifugDMEdRi4=
 github.com/go-logfmt/logfmt v0.6.0/go.mod h1:WYhtIu8zTZfxdn5+rREduYbwxfcBr/Vr6KEVveWlfTs=
-github.com/go-puzzles/puzzles v1.0.13 h1:rWb7IF0RvQ8jje0aLptgmBVodGFX0CHtwmoNv4mLuP8=
-github.com/go-puzzles/puzzles v1.0.13/go.mod h1:SgZRDA8js5FYvN9ByqhUacudF1suZmzU684eTTqci+w=
+github.com/go-puzzles/puzzles v1.0.14 h1:BHxQ1fWjTetNQwQms/2hb18AsEDi0EUUvg0qIctthkY=
+github.com/go-puzzles/puzzles v1.0.14/go.mod h1:SgZRDA8js5FYvN9ByqhUacudF1suZmzU684eTTqci+w=
 github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
 github.com/go-viper/mapstructure/v2 v2.0.0 h1:dhn8MZ1gZ0mzeodTG3jt5Vj/o87xZKuNAprG2mQfMfc=
 github.com/go-viper/mapstructure/v2 v2.0.0/go.mod h1:oJDH3BJKyqBA2TXFhDsKDGDTlndYOZ6rGS0BRZIxGhM=
