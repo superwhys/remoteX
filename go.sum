@@ -62,8 +62,8 @@ github.com/go-playground/universal-translator v0.18.1 h1:Bcnm0ZwsGyWbCzImXv+pAJn
 github.com/go-playground/universal-translator v0.18.1/go.mod h1:xekY+UJKNuX9WP91TpwSH2VMlDf28Uj24BCp08ZFTUY=
 github.com/go-playground/validator/v10 v10.22.1 h1:40JcKH+bBNGFczGuoBYgX4I6m/i27HYW8P9FDk5PbgA=
 github.com/go-playground/validator/v10 v10.22.1/go.mod h1:dbuPbCMFw/DrkbEynArYaCwl3amGuJotoKCe95atGMM=
-github.com/go-puzzles/pgin v1.0.4 h1:PHqBoOhFgRouQaNXyWDkWOWT+zhU+u914GXrr6od4Kk=
-github.com/go-puzzles/pgin v1.0.4/go.mod h1:MUkIYg8ZzeyAHRzsTKwpzoAwh2MmMT1ZLfbzroLrt8w=
+github.com/go-puzzles/pgin v1.0.5 h1:3BltzgYQAVZmIN0CJKxTQ71RqVthx6kXatB4m/vQO/I=
+github.com/go-puzzles/pgin v1.0.5/go.mod h1:MUkIYg8ZzeyAHRzsTKwpzoAwh2MmMT1ZLfbzroLrt8w=
 github.com/go-puzzles/puzzles v1.0.14 h1:BHxQ1fWjTetNQwQms/2hb18AsEDi0EUUvg0qIctthkY=
 github.com/go-puzzles/puzzles v1.0.14/go.mod h1:SgZRDA8js5FYvN9ByqhUacudF1suZmzU684eTTqci+w=
 github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
