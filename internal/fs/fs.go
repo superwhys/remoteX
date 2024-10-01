@@ -19,6 +19,10 @@ func NewBasicFileSystem() *BasicFileSystem {
 }
 
 func (f *BasicFileSystem) List(path string) (entries []*Entry, err error) {
+	if !filepath.IsAbs(path) {
+		return nil, ErrDirPahtNotAbs
+	}
+
 	if !PathExists(path) {
 		return nil, ErrDirPathNotFound
 	}
