@@ -2,71 +2,63 @@ package command
 
 import (
 	"context"
+	"fmt"
 	"time"
 	
+	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 	"github.com/superwhys/remoteX/domain/command"
-	"github.com/superwhys/remoteX/domain/command/filesystem"
-	"github.com/superwhys/remoteX/pkg/errorutils"
-	fsSrv "github.com/superwhys/remoteX/server/command/filesystem"
+	"github.com/superwhys/remoteX/server/command/filesystem"
 )
 
+type strategyHandler func(ctx context.Context, args command.Args) (proto.Message, error)
+
 type ServiceImpl struct {
-	fsService filesystem.Service
+	strategy map[command.CommandType]strategyHandler
 }
 
 func NewCommandService() command.Service {
-	return &ServiceImpl{
-		fsService: fsSrv.NewFilesystemService(),
+	s := &ServiceImpl{
+		strategy: map[command.CommandType]strategyHandler{},
 	}
+	
+	fsSrv := filesystem.NewFilesystemService()
+	
+	s.registerStrategy(command.Empty, s.doEmpty)
+	s.registerStrategy(command.Listdir, fsSrv.ListDir)
+	
+	return s
+}
+
+func (s *ServiceImpl) registerStrategy(cmdType command.CommandType, handler strategyHandler) {
+	s.strategy[cmdType] = handler
+}
+
+func (s *ServiceImpl) handleCommand(ctx context.Context, cmdType command.CommandType, args command.Args) (proto.Message, error) {
+	handler, ok := s.strategy[cmdType]
+	if !ok {
+		return nil, fmt.Errorf("unknown command type: %s", cmdType)
+	}
+	
+	return handler(ctx, args)
 }
 
 func (s *ServiceImpl) DoCommand(ctx context.Context, cmd *command.Command) (ret *command.Ret, err error) {
-	
-	switch cmd.Type {
-	case command.Empty:
-		ret, err = s.doEmpty(cmd)
-	case command.Listdir:
-		ret, err = s.doListDir(cmd)
-	}
-	
-	return
-}
-
-func (s *ServiceImpl) doEmpty(cmd *command.Command) (ret *command.Ret, err error) {
-	resp := &command.MapResp{Data: map[string]string{"now_time": time.Now().Format(time.DateTime)}}
-	
-	anyData, err := types.MarshalAny(resp)
+	pm, err := s.handleCommand(ctx, cmd.GetType(), cmd.GetArgs())
 	if err != nil {
 		return nil, err
 	}
 	
-	ret = &command.Ret{Command: cmd, Resp: anyData}
-	return
-}
-
-func (s *ServiceImpl) doListDir(cmd *command.Command) (ret *command.Ret, err error) {
-	args := cmd.GetArgs()
-	if len(args) < 1 {
-		err = errorutils.ErrCommandMissingArguments(int32(cmd.GetType()), cmd.GetArgs())
-		return
-	}
-	
-	path, exists := args["path"]
-	if !exists {
-		err = errorutils.ErrCommandMissingArguments(int32(cmd.GetType()), cmd.GetArgs())
-		return
-	}
-	
-	entries, err := s.fsService.ListDir(path)
-	if err != nil {
-		return nil, err
-	}
-	
-	anyData, err := types.MarshalAny(entries)
+	anyData, err := types.MarshalAny(pm)
 	if err != nil {
 		return nil, err
 	}
 	
 	return &command.Ret{Command: cmd, Resp: anyData}, nil
+}
+
+func (s *ServiceImpl) doEmpty(_ context.Context, _ command.Args) (proto.Message, error) {
+	resp := &command.MapResp{Data: map[string]string{"now_time": time.Now().Format(time.DateTime)}}
+	
+	return resp, nil
 }

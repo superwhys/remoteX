@@ -9,9 +9,12 @@
 package filesystem
 
 import (
-	"github.com/superwhys/remoteX/internal/fs"
+	"context"
+	
+	"github.com/gogo/protobuf/proto"
+	"github.com/superwhys/remoteX/domain/command"
 )
 
 type Service interface {
-	ListDir(path string) (*fs.ListResp, error)
+	ListDir(ctx context.Context, args command.Args) (proto.Message, error)
 }
