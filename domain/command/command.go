@@ -2,7 +2,6 @@ package command
 
 import (
 	"encoding/json"
-	"fmt"
 	
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
@@ -22,7 +21,6 @@ func (m *Ret) MarshalJSON() ([]byte, error) {
 	}
 	
 	if m.Resp != nil {
-		fmt.Println(m.Resp.TypeUrl)
 		pm, err := protoutils.DecodeAnyProto(m.Resp)
 		if err != nil {
 			respValue["resp"] = err.Error()
