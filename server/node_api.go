@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-puzzles/pgin"
 	"github.com/go-puzzles/puzzles/plog"
+	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/pkg/common"
 )
 
@@ -34,4 +35,19 @@ func (s *RemoteXServer) getNode(c *gin.Context, req *getNode) {
 	}
 
 	pgin.ReturnSuccess(c, node)
+}
+
+type listDirReq struct {
+	Path string `form:"path"`
+}
+
+func (s *RemoteXServer) listDir(c *gin.Context, req *listDirReq) {
+	cmd := &command.Command{Type: command.Listdir, Args: map[string]string{"path": req.Path}}
+	ret, err := s.commandService.DoCommand(c, cmd)
+	if err != nil {
+		pgin.ReturnError(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	pgin.ReturnSuccess(c, ret)
 }

@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package connection;
 
-import "domain/node/node.proto";
 import "ext.proto";
 import "pkg/protocol/protocol.proto";
 

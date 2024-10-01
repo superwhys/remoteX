@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package entry;
+
+import "ext.proto";
+
+
+enum EntryType {
+  ENTRY_TYPE_UNKNOWN = 0;
+  ENTRY_TYPE_FILE = 1;
+  ENTRY_TYPE_DIR = 2;
+}
+
+message Entry {
+  string name = 1 [(ext.json) = "name,omitempty"];
+  EntryType type = 2 [(ext.json) = "type,omitempty"]; 
+  int64 size = 3 [(ext.json) = "size,omitempty"];
+  string path = 4 [(ext.json) = "path,omitempty"];
+  string created_time = 5 [(ext.json) = "created_time,omitempty"];
+  string modified_time = 6 [(ext.json) = "modified_time,omitempty"];
+  string accessed_time = 7 [(ext.json) = "accessed_time,omitempty"];
+  string owner = 8 [(ext.json) = "owner,omitempty"];
+  string permissions = 9 [(ext.json) = "permissions,omitempty"];
+  repeated Entry children = 10 [(ext.json) = "children,omitempty", (ext.nullable) = true];
+}
+
+message ListResp {
+	repeated Entry entries = 1 [(ext.nullable) = true];
+}

@@ -4,15 +4,15 @@ import (
 	"context"
 	"iter"
 	"time"
-
+	
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/auth"
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/domain/node"
-	"github.com/superwhys/remoteX/pkg/connection/dialer"
-	"github.com/superwhys/remoteX/pkg/connection/listener"
+	"github.com/superwhys/remoteX/internal/connection/dialer"
+	"github.com/superwhys/remoteX/internal/connection/listener"
 	"github.com/superwhys/remoteX/pkg/limiter"
 	"github.com/superwhys/remoteX/pkg/svcutils"
 	"github.com/thejerf/suture/v4"
@@ -21,7 +21,7 @@ import (
 
 type RemoteXServer struct {
 	*suture.Supervisor
-
+	
 	opt               *Option
 	nodeService       node.Service
 	connService       connection.Service
@@ -40,7 +40,7 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 	server := &RemoteXServer{
 		opt:        opt,
 		Supervisor: suture.NewSimple("RemoteX.Service"),
-
+		
 		nodeService:       node.NewNodeService(local),
 		authService:       auth.NewSimpleAuthService(),
 		connService:       connection.NewConnectionService(local.URL(), opt.TlsConfig),
@@ -49,33 +49,33 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 		limiter:           limiter.NewLimiter(local.NodeId, transConf.MaxRecvKbps, transConf.MaxSendKbps),
 		connections:       make(chan connection.TlsConn),
 	}
-
+	
 	server.registerNode(opt.Local)
-
+	
 	listener.InitListener()
 	dialer.InitDialer()
-
+	
 	// TODO: retry while server was down
 	go server.StartDialer(context.Background())
-
+	
 	server.Add(svcutils.AsService(server.StartListener, "startListener"))
 	server.Add(svcutils.AsService(server.HandleConnection, "handleConnection"))
-
+	
 	return server
 }
 
 func (s *RemoteXServer) StartDialer(ctx context.Context) error {
 	for _, client := range s.opt.Conf.DialClients {
 		target := client.URL()
-
+		
 		conn, err := s.connService.EstablishConnection(ctx, target)
 		if err != nil {
 			return errors.Wrap(err, "failed to establish connection")
 		}
-
+		
 		s.connections <- conn
 	}
-
+	
 	return nil
 }
 
@@ -93,7 +93,7 @@ func (s *RemoteXServer) HandleConnection(ctx context.Context) error {
 			}
 			s.registerConnection(conn)
 			plog.Debugf("register connection: %v. NodeId: %v", conn.GetConnectionId(), conn.GetNodeId())
-
+			
 			s.background(ctx, conn)
 		}(remote, conn)
 	}
@@ -109,20 +109,20 @@ func (s *RemoteXServer) connectionPrepareIter(ctx context.Context) iter.Seq2[*no
 				break
 			case conn = <-s.connections:
 			}
-
+			
 			if err := s.connService.CheckConnection(conn); err != nil {
 				plog.Errorf("check connection err: %v", err)
 				conn.Close()
 				continue
 			}
-
+			
 			remote, err := s.connectionHandshake(conn)
 			if err != nil {
 				plog.Errorf("listen connection handshake err: %v", err)
 				conn.Close()
 				continue
 			}
-
+			
 			if !yield(remote, conn) {
 				plog.Errorf("yield remoteNode and TlsConn error")
 				conn.Close()
@@ -134,13 +134,13 @@ func (s *RemoteXServer) connectionPrepareIter(ctx context.Context) iter.Seq2[*no
 
 func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn) {
 	eg, ctx := errgroup.WithContext(ctx)
-
+	
 	hbStartNotify := make(chan struct{})
-
+	
 	eg.Go(func() error {
 		return s.schedulerHeartbeat(ctx, conn, hbStartNotify)
 	})
-
+	
 	// must be called after heartbeat is start
 	eg.Go(func() error {
 		select {
@@ -151,7 +151,7 @@ func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn)
 			return s.schedulerCommand(ctx, conn)
 		}
 	})
-
+	
 	if err := eg.Wait(); err != nil {
 		plog.Errorf("failed to run background connection: %v", err)
 		s.nodeService.UpdateNodeStatus(conn.GetNodeId(), node.NodeStatusOffline)

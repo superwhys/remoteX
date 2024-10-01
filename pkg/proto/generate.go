@@ -14,7 +14,7 @@ import (
 // Then build our vanity compiler that uses the new extensions
 //go:generate go build -o scripts/protoc-gen-remotex scripts/protoc_plugin.go
 
-//go:generate go run generate.go config pkg/protocol domain/node domain/connection domain/command
+//go:generate go run generate.go config pkg/protocol domain/node domain/connection domain/command internal/fs
 
 func main() {
 	goPath := os.Getenv("GOPATH")
@@ -29,8 +29,8 @@ func main() {
 			"-I", "..",
 			"-I", ".",
 			"-I", fmt.Sprintf("%v/src/github.com/gogo/protobuf/protobuf", goPath),
-			"--plugin=protoc-gen-filesync=scripts/protoc-gen-remotex",
-			"--filesync_out=paths=source_relative:../..",
+			"--plugin=protoc-gen-goremotex=scripts/protoc-gen-remotex",
+			"--goremotex_out", "Mgoogle/protobuf/any.proto=github.com/gogo/protobuf/types,paths=source_relative:../..",
 		}
 		args = append(args, matches...)
 		cmd := exec.Command("protoc", args...)

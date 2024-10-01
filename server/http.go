@@ -12,6 +12,7 @@ func (s *RemoteXServer) SetupHttpServer() *gin.Engine {
 	{
 		nodeRouter.GET("", s.getAllNodes())
 		nodeRouter.GET("/:nodeId", pgin.RequestHandler(s.getNode))
+		nodeRouter.GET("/list/dir", pgin.RequestHandler(s.listDir))
 	}
 
 	return engine
