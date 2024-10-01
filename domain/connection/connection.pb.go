@@ -6,8 +6,8 @@ package connection
 import (
 	fmt "fmt"
 	proto "github.com/gogo/protobuf/proto"
+	_ "github.com/superwhys/remoteX/internal/proto/ext"
 	github_com_superwhys_remoteX_pkg_common "github.com/superwhys/remoteX/pkg/common"
-	_ "github.com/superwhys/remoteX/pkg/proto/ext"
 	protocol "github.com/superwhys/remoteX/pkg/protocol"
 	io "io"
 	math "math"

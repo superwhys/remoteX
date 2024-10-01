@@ -7,7 +7,7 @@ import (
 	fmt "fmt"
 	proto "github.com/gogo/protobuf/proto"
 	node "github.com/superwhys/remoteX/domain/node"
-	_ "github.com/superwhys/remoteX/pkg/proto/ext"
+	_ "github.com/superwhys/remoteX/internal/proto/ext"
 	protocol "github.com/superwhys/remoteX/pkg/protocol"
 	io "io"
 	math "math"

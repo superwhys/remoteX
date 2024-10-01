@@ -4,7 +4,7 @@ package ext;
 
 import "google/protobuf/descriptor.proto";
 
-option go_package = "github.com/superwhys/remoteX/pkg/proto/ext";
+option go_package = "github.com/superwhys/remoteX/internal/proto/ext";
 
 
 extend google.protobuf.FieldOptions {
