@@ -17,6 +17,11 @@ import (
 	"github.com/superwhys/remoteX/pkg/svcutils"
 	"github.com/thejerf/suture/v4"
 	"golang.org/x/sync/errgroup"
+	
+	authSrv "github.com/superwhys/remoteX/server/auth"
+	commandSrv "github.com/superwhys/remoteX/server/command"
+	connSrv "github.com/superwhys/remoteX/server/connection"
+	nodeSrv "github.com/superwhys/remoteX/server/node"
 )
 
 type RemoteXServer struct {
@@ -41,10 +46,10 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 		opt:        opt,
 		Supervisor: suture.NewSimple("RemoteX.Service"),
 		
-		nodeService:       node.NewNodeService(local),
-		authService:       auth.NewSimpleAuthService(),
-		connService:       connection.NewConnectionService(local.URL(), opt.TlsConfig),
-		commandService:    command.NewCommandService(),
+		nodeService:       nodeSrv.NewNodeService(local),
+		authService:       authSrv.NewSimpleAuthService(),
+		connService:       connSrv.NewConnectionService(local.URL(), opt.TlsConfig),
+		commandService:    commandSrv.NewCommandService(),
 		heartbeatInterval: time.Second * time.Duration(opt.Conf.HeartbeatInterval),
 		limiter:           limiter.NewLimiter(local.NodeId, transConf.MaxRecvKbps, transConf.MaxSendKbps),
 		connections:       make(chan connection.TlsConn),

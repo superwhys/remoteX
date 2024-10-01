@@ -15,24 +15,3 @@ import (
 type Service interface {
 	ListDir(path string) (*fs.ListResp, error)
 }
-
-type ServiceImpl struct {
-	fs fs.FileSystem
-}
-
-func NewFilesystemService() Service {
-	return &ServiceImpl{
-		fs: fs.NewBasicFileSystem(),
-	}
-}
-
-func (s *ServiceImpl) ListDir(path string) (*fs.ListResp, error) {
-	entries, err := s.fs.List(path)
-	if err != nil {
-		return nil, err
-	}
-
-	return &fs.ListResp{
-		Entries: entries,
-	}, nil
-}

@@ -5,17 +5,3 @@ package auth
 type Service interface {
 	AuthConnection() (err error)
 }
-
-var _ Service = (*SimpleAuth)(nil)
-
-// SimpleAuth simply determines that the other party is a legitimate connection by exchanging protoMessages of nodes
-type SimpleAuth struct {
-}
-
-func NewSimpleAuthService() Service {
-	return &SimpleAuth{}
-}
-
-func (s *SimpleAuth) AuthConnection() (err error) {
-	return nil
-}
