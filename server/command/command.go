@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"time"
-	
+
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 	"github.com/superwhys/remoteX/domain/command"
@@ -21,12 +21,12 @@ func NewCommandService() command.Service {
 	s := &ServiceImpl{
 		strategy: map[command.CommandType]strategyHandler{},
 	}
-	
+
 	fsSrv := filesystem.NewFilesystemService()
-	
+
 	s.registerStrategy(command.Empty, s.doEmpty)
 	s.registerStrategy(command.Listdir, fsSrv.ListDir)
-	
+
 	return s
 }
 
@@ -39,7 +39,7 @@ func (s *ServiceImpl) handleCommand(ctx context.Context, cmdType command.Command
 	if !ok {
 		return nil, fmt.Errorf("unknown command type: %s", cmdType)
 	}
-	
+
 	return handler(ctx, args)
 }
 
@@ -48,17 +48,17 @@ func (s *ServiceImpl) DoCommand(ctx context.Context, cmd *command.Command) (ret 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	anyData, err := types.MarshalAny(pm)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &command.Ret{Command: cmd, Resp: anyData}, nil
 }
 
 func (s *ServiceImpl) doEmpty(_ context.Context, _ command.Args) (proto.Message, error) {
 	resp := &command.MapResp{Data: map[string]string{"now_time": time.Now().Format(time.DateTime)}}
-	
+
 	return resp, nil
 }

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	
+
 	"github.com/pkg/errors"
 	"github.com/thejerf/suture/v4"
 )
@@ -50,13 +50,13 @@ func (s *service) Serve(ctx context.Context) error {
 	s.mut.Lock()
 	s.err = nil
 	s.mut.Unlock()
-	
+
 	err := waitContext(ctx, s.serve(ctx))
-	
+
 	s.mut.Lock()
 	s.err = err
 	s.mut.Unlock()
-	
+
 	return err
 }
 
@@ -77,6 +77,7 @@ func waitContext(ctx context.Context, err error) error {
 	default:
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return nil
 		return fmt.Errorf("%s (non-context)", err.Error())
 	}
 	return err
