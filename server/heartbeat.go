@@ -61,6 +61,7 @@ func (s *RemoteXServer) sendHeartbeat(stream connection.Stream) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to refresh current node")
 	}
+	cn.IsLocal = false
 
 	if err := stream.WriteMessage(cn); err != nil {
 		return errors.Wrap(err, "failed to write heartbeat message")

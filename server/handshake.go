@@ -49,6 +49,8 @@ func (s *RemoteXServer) exchangeNodeMessage(sc connection.Stream, direction exch
 		}
 	}
 
+	remote.IsLocal = false
+
 	return remote, nil
 }
 
