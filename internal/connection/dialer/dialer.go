@@ -14,6 +14,7 @@ var errUnexpectedInterfaceType = errors.New("unexpected interface type")
 
 func InitDialer() {
 	initTcpDialer()
+	initQuicDialer()
 }
 
 func DialContext(ctx context.Context, network, addr string) (net.Conn, error) {

@@ -7,7 +7,7 @@ import (
 	"net"
 	"net/url"
 	"time"
-	
+
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/superwhys/remoteX/domain/connection"
 	connPkg "github.com/superwhys/remoteX/internal/connection"
@@ -30,28 +30,28 @@ type TcpListener struct {
 func (t *TcpListener) Listen(ctx context.Context, connections chan<- connection.TlsConn) error {
 	local := t.local
 	tlsConf := t.tlsConf
-	
+
 	tcpAddr, err := net.ResolveTCPAddr(local.Scheme, local.Host)
 	if err != nil {
 		plog.Errorc(ctx, "Resolve tcp addr error: %v", err)
 		return err
 	}
-	
+
 	lisConf := net.ListenConfig{}
-	
+
 	listener, err := lisConf.Listen(ctx, local.Scheme, tcpAddr.String())
 	if err != nil {
 		plog.Errorc(ctx, "Listen tcp addr error: %v", err)
 		return err
 	}
 	defer listener.Close()
-	
+
 	plog.Infoc(ctx, "TCP listener (%v) starting", tcpAddr)
 	defer plog.Infoc(ctx, "TCP listener (%v) shutting down", tcpAddr)
-	
+
 	acceptFailures := 0
 	const maxAcceptFailures = 10
-	
+
 	tcpListener := listener.(*net.TCPListener)
 	for {
 		_ = tcpListener.SetDeadline(time.Now().Add(time.Second))
@@ -60,30 +60,31 @@ func (t *TcpListener) Listen(ctx context.Context, connections chan<- connection.
 		case <-ctx.Done():
 			if err == nil {
 				conn.Close()
+				return ctx.Err()
 			}
-			return nil
+			return err
 		default:
 		}
-		
+
 		if err != nil {
 			opErr := new(net.OpError)
 			if errors.As(err, &opErr) && !opErr.Timeout() {
 				plog.Warnf("Listen Tcp Accepting connection error:", err)
-				
+
 				acceptFailures++
 				if acceptFailures > maxAcceptFailures {
 					return err
 				}
-				
+
 				time.Sleep(time.Duration(acceptFailures) * time.Second)
-				
+
 			}
 			continue
 		}
-		
+
 		acceptFailures = 0
 		plog.Debugf("Listen TCP: connect from %v", conn.RemoteAddr())
-		
+
 		if err := connPkg.SetTcpOptions(conn); err != nil {
 			plog.Errorf("SetTcpOptions error: %v", err)
 			conn.Close()
@@ -95,7 +96,7 @@ func (t *TcpListener) Listen(ctx context.Context, connections chan<- connection.
 			tc.Close()
 			continue
 		}
-		
+
 		connId := connection.GenerateConnectionID(tlsutils.LocalHost(tc), tlsutils.RemoteHost(tc))
 		sc, err := connPkg.NewTcpConnectionServer(connId, tc)
 		if err != nil {
@@ -103,7 +104,7 @@ func (t *TcpListener) Listen(ctx context.Context, connections chan<- connection.
 			tc.Close()
 			continue
 		}
-		
+
 		c := &connection.Connection{
 			ConnectionId:  connId,
 			LocalAddress:  tc.LocalAddr().String(),
@@ -126,6 +127,6 @@ func (t *TcpListenerFactory) New(local *url.URL, tlsConf *tls.Config) connection
 		local:   local,
 		tlsConf: tlsConf,
 	}
-	
+
 	return l
 }

@@ -5,7 +5,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/pkg/common"
 	"github.com/superwhys/remoteX/pkg/protoutils"
@@ -97,6 +96,7 @@ var _ connection.Stream = (*TcpStream)(nil)
 
 type TcpStream struct {
 	*smux.Stream
+	*StreamReadWriter
 
 	pr           *protoutils.ProtoReader
 	pw           *protoutils.ProtoWriter
@@ -106,29 +106,11 @@ type TcpStream struct {
 
 func NewTcpStream(connId string, stream *smux.Stream) *TcpStream {
 	return &TcpStream{
-		Stream:       stream,
-		pr:           protoutils.NewProtoReader(stream),
-		pw:           protoutils.NewProtoWriter(stream),
-		connectionId: connId,
+		Stream: stream,
+		StreamReadWriter: &StreamReadWriter{
+			pr:           protoutils.NewProtoReader(stream),
+			pw:           protoutils.NewProtoWriter(stream),
+			connectionId: connId,
+		},
 	}
-}
-
-func (t *TcpStream) ReadMessage(message proto.Message) error {
-	return t.pr.ReadMessage(message)
-}
-
-func (t *TcpStream) WriteMessage(m proto.Message) error {
-	return t.pw.WriteMessage(m)
-}
-
-func (t *TcpStream) GetConnectionId() string {
-	return t.connectionId
-}
-
-func (t *TcpStream) GetNodeId() common.NodeID {
-	return t.nodeId
-}
-
-func (t *TcpStream) SetNodeId(nodeId common.NodeID) {
-	t.nodeId = nodeId
 }
