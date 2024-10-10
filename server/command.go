@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/domain/connection"
+	"github.com/superwhys/remoteX/pkg/common"
 )
 
 func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.TlsConn) error {
@@ -65,4 +66,35 @@ func (s *RemoteXServer) handleCommand(ctx context.Context, stream connection.Str
 	}
 
 	return nil
+}
+
+func (s *RemoteXServer) handleRemoteCommand(ctx context.Context, nodeId common.NodeID, cmd *command.Command) (resp *command.Ret, err error) {
+	remoteNode, err := s.nodeService.GetNode(nodeId)
+	if err != nil {
+		return nil, errors.Wrap(err, "getNode")
+	}
+
+	connId := remoteNode.GetConnectionId()
+
+	conn, err := s.connService.GetConnection(connId)
+	if err != nil {
+		return nil, errors.Wrap(err, "getConnection")
+	}
+
+	stream, err := conn.OpenStream()
+	if err != nil {
+		return nil, errors.Wrap(err, "openStream")
+	}
+	defer stream.Close()
+
+	if err = stream.WriteMessage(cmd); err != nil {
+		return nil, errors.Wrap(err, "writeCommandMessage")
+	}
+
+	resp = new(command.Ret)
+	if err = stream.ReadMessage(resp); err != nil {
+		return nil, errors.Wrap(err, "readRespMessage")
+	}
+
+	return resp, nil
 }

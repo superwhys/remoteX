@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -50,4 +51,25 @@ func (s *RemoteXServer) listDir(c *gin.Context, req *listDirReq) {
 	}
 
 	pgin.ReturnSuccess(c, ret)
+}
+
+type listRemoteDir struct {
+	NodeId string `uri:"nodeId"`
+	Path   string `form:"path"`
+}
+
+func (s *RemoteXServer) listRemoteDir(c *gin.Context, req *listRemoteDir) {
+	if req.NodeId == "" {
+		pgin.ReturnError(c, http.StatusBadRequest, "remote nodeId is required")
+		return
+	}
+	cmd := &command.Command{Type: command.Listdir, Args: map[string]string{"path": req.Path}}
+
+	resp, err := s.handleRemoteCommand(c, common.NodeID(req.NodeId), cmd)
+	if err != nil {
+		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("handle remote command error: %v", err))
+		return
+	}
+
+	pgin.ReturnSuccess(c, resp)
 }
