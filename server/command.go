@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/domain/connection"
-	"github.com/superwhys/remoteX/pkg/counter"
 )
 
 func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.TlsConn) error {
@@ -32,11 +31,7 @@ func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.Tl
 			go func(stream connection.Stream) {
 				// pack limiter and counter
 				limitStream := connection.PackLimiterStream(stream, s.limiter)
-				counterStream := connection.PackCounterConnection(
-					stream,
-					&counter.CountingReader{Reader: limitStream},
-					&counter.CountingWriter{Writer: limitStream},
-				)
+				counterStream := connection.PackCounterStream(limitStream)
 
 				if err := s.handleCommand(ctx, counterStream); err != nil {
 					plog.Errorf("handle command error: %v", err)

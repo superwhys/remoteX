@@ -159,9 +159,9 @@ type CounterStream struct {
 	wr *counter.CountingWriter
 }
 
-func PackCounterConnection(stream Stream, rd io.Reader, wr io.Writer) *CounterStream {
-	crd := &counter.CountingReader{Reader: rd}
-	cwr := &counter.CountingWriter{Writer: wr}
+func PackCounterStream(stream Stream) *CounterStream {
+	crd := &counter.CountingReader{Reader: stream}
+	cwr := &counter.CountingWriter{Writer: stream}
 
 	return &CounterStream{
 		Stream:             stream,
