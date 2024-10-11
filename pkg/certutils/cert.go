@@ -2,10 +2,10 @@ package certutils
 
 import (
 	"crypto/tls"
-
+	
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/superwhys/remoteX/config"
-	"github.com/superwhys/remoteX/pkg/tlsutils"
+	tlsutils "github.com/superwhys/remoteX/internal/tls"
 )
 
 var (
