@@ -2,7 +2,9 @@ package server
 
 import (
 	"iter"
+	"net"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/go-puzzles/puzzles/plog"
@@ -47,6 +49,11 @@ func (s *RemoteXServer) exchangeNodeMessage(sc connection.Stream, direction exch
 		if err := fn(arg); err != nil {
 			return nil, err
 		}
+	}
+	ipAddr := net.ParseIP(remote.Address.GetIpAddress())
+	if ipAddr == nil || ipAddr.IsUnspecified() || ipAddr.IsLoopback() {
+		addrSplit := strings.Split(sc.RemoteAddr().String(), ":")
+		remote.Address.IpAddress = strings.Join(addrSplit[:len(addrSplit)-1], ":")
 	}
 
 	remote.IsLocal = false

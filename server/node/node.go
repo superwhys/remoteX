@@ -3,7 +3,7 @@ package node
 import (
 	"sync"
 	"time"
-	
+
 	"github.com/superwhys/remoteX/domain/node"
 	"github.com/superwhys/remoteX/pkg/common"
 	"github.com/superwhys/remoteX/pkg/errorutils"
@@ -17,11 +17,17 @@ type ServiceImpl struct {
 }
 
 func NewNodeService(local *node.Node) *ServiceImpl {
-	return &ServiceImpl{
-		localNode: local,
+	s := &ServiceImpl{
+		localNode: new(node.Node),
 		rl:        &sync.RWMutex{},
 		nodes:     make(map[common.NodeID]*node.Node),
 	}
+	copyNode := *local
+	s.localNode = &copyNode
+
+	s.RegisterNode(local)
+
+	return s
 }
 
 func (ds *ServiceImpl) RegisterNode(n *node.Node) error {
@@ -29,7 +35,7 @@ func (ds *ServiceImpl) RegisterNode(n *node.Node) error {
 	if oldNode != nil && oldNode.CheckNodeOnline() {
 		return errorutils.ErrNode(n.NodeId, errorutils.WithMsg("Has a same online node"))
 	}
-	
+
 	addr := n.Address
 	if addr.IpAddress == "" || addr.Port == 0 {
 		return errorutils.ErrNode(n.NodeId, errorutils.WithMsg("missing addr or port"))
@@ -43,26 +49,26 @@ func (ds *ServiceImpl) GetNode(nodeId common.NodeID) (*node.Node, error) {
 	if !exists {
 		return nil, errorutils.ErrNodeNotFound(nodeId)
 	}
-	
+
 	return node, nil
 }
 
 func (ds *ServiceImpl) GetNodes() ([]*node.Node, error) {
 	ds.rl.RLock()
 	defer ds.rl.RUnlock()
-	
+
 	nodes := make([]*node.Node, 0, len(ds.nodes))
 	for _, n := range ds.nodes {
 		nodes = append(nodes, n)
 	}
-	
+
 	return nodes, nil
 }
 
 func (ds *ServiceImpl) GetLocal() *node.Node {
 	ds.rl.RLock()
 	defer ds.rl.RUnlock()
-	
+
 	return ds.localNode
 }
 
@@ -70,15 +76,15 @@ func (ds *ServiceImpl) RefreshCurrentNode() (*node.Node, error) {
 	ds.rl.RLock()
 	currentNode := ds.localNode
 	ds.rl.RUnlock()
-	
+
 	os, arch := osutils.GetOsArch()
 	currentNode.Configuration.Os = node.GetOsName(os)
 	currentNode.Configuration.Arch = node.GetArch(arch)
 	currentNode.LastHeartbeat = time.Now().Unix()
-	
+
 	ds.rl.Lock()
 	defer ds.rl.Unlock()
-	
+
 	ds.localNode = currentNode
 	return currentNode, nil
 }

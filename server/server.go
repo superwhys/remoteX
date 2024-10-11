@@ -55,8 +55,6 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 		connections:       make(chan connection.TlsConn),
 	}
 
-	server.registerNode(opt.Local)
-
 	listener.InitListener()
 	dialer.InitDialer()
 
