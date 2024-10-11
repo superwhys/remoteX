@@ -1,11 +1,3 @@
-// File:		command.go
-// Created by:	Hoven
-// Created on:	2024-10-01
-//
-// This file is part of the Example Project.
-//
-// (c) 2024 Example Corp. All rights reserved.
-
 package errorutils
 
 type CommandError struct {
@@ -20,7 +12,7 @@ func ErrCommand(cmdType int32, args map[string]string, opts ...ErrOption) *Comma
 		cmdType:   cmdType,
 		args:      args,
 	}
-
+	
 	for _, opt := range opts {
 		opt(err.BaseError)
 	}

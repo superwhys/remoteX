@@ -6,6 +6,19 @@ import (
 	"time"
 )
 
+func (ns NodeStatus) ToString() string {
+	switch ns {
+	case NodeStatusUnknown:
+		return "Unknown"
+	case NodeStatusOnline:
+		return "Online"
+	case NodeStatusOffline:
+		return "Offline"
+	default:
+		return fmt.Sprintf("Unknown (%d)", ns)
+	}
+}
+
 func GetOsName(o string) NodeOS {
 	switch o {
 	case "linux":

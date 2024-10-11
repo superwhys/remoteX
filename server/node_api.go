@@ -19,7 +19,7 @@ func (s *RemoteXServer) getAllNodes() gin.HandlerFunc {
 			return
 		}
 
-		pgin.ReturnSuccess(c, nodes)
+		pgin.ReturnSuccess(c, NodesToDtos(nodes))
 	}
 }
 
@@ -35,7 +35,7 @@ func (s *RemoteXServer) getNode(c *gin.Context, req *getNode) {
 		return
 	}
 
-	pgin.ReturnSuccess(c, node)
+	pgin.ReturnSuccess(c, NodeToDto(node))
 }
 
 type listDirReq struct {

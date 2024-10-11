@@ -1,16 +1,8 @@
-// File:		decoder.go
-// Created by:	Hoven
-// Created on:	2024-10-01
-//
-// This file is part of the Example Project.
-//
-// (c) 2024 Example Corp. All rights reserved.
-
 package protoutils
 
 import (
 	"errors"
-
+	
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 )
@@ -30,6 +22,6 @@ func DecodeAnyProto(anyProto *types.Any) (proto.Message, error) {
 	if !exists {
 		return nil, errors.New("unknown any.proto decoder")
 	}
-
+	
 	return decoder(anyProto.Value)
 }

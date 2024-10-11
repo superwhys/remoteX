@@ -1,11 +1,3 @@
-// File:		writer_test.go
-// Created by:	Hoven
-// Created on:	2024-08-02
-//
-// This file is part of the Example Project.
-//
-// (c) 2024 Example Corp. All rights reserved.
-
 package limiter
 
 import (

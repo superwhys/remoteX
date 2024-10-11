@@ -1,16 +1,8 @@
-// File:		connection.go
-// Created by:	Hoven
-// Created on:	2024-09-26
-//
-// This file is part of the Example Project.
-//
-// (c) 2024 Example Corp. All rights reserved.
-
 package errorutils
 
 import (
 	"fmt"
-
+	
 	"github.com/superwhys/remoteX/pkg/common"
 )
 
@@ -24,11 +16,11 @@ func ErrConnection(connId string, opts ...ErrOption) *ConnectionError {
 		BaseError:    &BaseError{},
 		connectionId: connId,
 	}
-
+	
 	for _, opt := range opts {
 		opt(e.BaseError)
 	}
-
+	
 	return e
 }
 
