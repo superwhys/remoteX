@@ -14,7 +14,7 @@ import (
 // Then build our vanity compiler that uses the new extensions
 //go:generate go build -o scripts/protoc-gen-remotex scripts/protoc_plugin.go
 
-//go:generate go run generate.go config pkg/protocol domain/node domain/connection domain/command internal/fs
+//go:generate go run generate.go config pkg/protocol domain/node domain/connection domain/command internal/fs internal/filesync
 
 func main() {
 	goPath := os.Getenv("GOPATH")
@@ -24,7 +24,7 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Println(path, "returned:", matches)
-
+		
 		args := []string{
 			"-I", "..",
 			"-I", ".",
@@ -36,7 +36,7 @@ func main() {
 		cmd := exec.Command("protoc", args...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-
+		
 		if err := cmd.Run(); err != nil {
 			log.Fatal("Failed generating", path)
 		}
