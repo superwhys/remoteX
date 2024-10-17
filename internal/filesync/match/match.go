@@ -7,21 +7,14 @@ import (
 	
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
-	"github.com/superwhys/remoteX/internal/filesync"
 	"github.com/superwhys/remoteX/internal/filesync/file"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
+	"github.com/superwhys/remoteX/internal/filesync/pb"
 )
-
-type chunk struct {
-	// hash used to store block data that has already been matched
-	hash *filesync.HashBuf
-	// data used to store the origin byte data which not matched
-	data []byte
-}
 
 // HashMatch is used to compare the HashHead transmitted from the client
 // with the source file from the server
-func HashMatch(ctx context.Context, head *filesync.HashHead, srcFile *file.File) (matchIter iter.Seq2[*chunk, error], err error) {
+func HashMatch(ctx context.Context, head *pb.HashHead, srcFile *file.File) (matchIter iter.Seq2[*pb.FileChunk, error], err error) {
 	var (
 		buf         []byte
 		fileSize    int64
@@ -31,18 +24,18 @@ func HashMatch(ctx context.Context, head *filesync.HashHead, srcFile *file.File)
 		
 		hashHits     int
 		hashs        = head.GetHashs()
-		hashMap      = filesync.GetHashMap(head)
+		hashMap      = GetHashMap(head)
 		notMatchData = make([]byte, 0, head.GetBlockLength())
 	)
 	
-	yieldNotMatchData := func(force bool, yield func(*chunk, error) bool) {
+	yieldNotMatchData := func(force bool, yield func(*pb.FileChunk, error) bool) {
 		if force || len(notMatchData) >= int(head.GetBlockLength()) {
-			yield(&chunk{data: notMatchData}, nil)
+			yield(&pb.FileChunk{Data: notMatchData}, nil)
 			notMatchData = notMatchData[:0]
 		}
 	}
 	
-	matchIter = func(yield func(*chunk, error) bool) {
+	matchIter = func(yield func(*pb.FileChunk, error) bool) {
 		fi, err := srcFile.Stat()
 		if err != nil {
 			yield(nil, err)
@@ -53,7 +46,7 @@ func HashMatch(ctx context.Context, head *filesync.HashHead, srcFile *file.File)
 		
 		plog.Infof("HashSearch path=%s len(sums)=%d, srcFileSize=%d", srcFile.Name(), len(head.GetHashs()), fileSize)
 		
-		// read the first chunk with offset: 0
+		// read the first pb.FileChunk with offset: 0
 		if buf, sum, blockLength, err = file.ReadFileBuf(srcFile, fileSize, offset, head); err != nil {
 			yield(nil, err)
 			return
@@ -63,10 +56,24 @@ func HashMatch(ctx context.Context, head *filesync.HashHead, srcFile *file.File)
 	
 	Outer:
 		for {
+			select {
+			case <-ctx.Done():
+				yield(nil, ctx.Err())
+				return
+			default:
+			
+			}
 			blockIdx, match := hashMap[sum]
 			if match {
 				yieldNotMatchData(true, yield)
 				for ; blockIdx < head.GetCheckSumCount(); blockIdx++ {
+					select {
+					case <-ctx.Done():
+						yield(nil, ctx.Err())
+						return
+					default:
+					}
+					
 					// check if the content of this block matches
 					if hashs[blockIdx].GetLen() != blockLength || hashs[blockIdx].Sum1 != sum {
 						break
@@ -77,8 +84,10 @@ func HashMatch(ctx context.Context, head *filesync.HashHead, srcFile *file.File)
 						break
 					}
 					
+					plog.Debugf("hash match for offset: %d", offset)
+					
 					hashHits++
-					if !yield(&chunk{hash: hashs[blockIdx]}, nil) {
+					if !yield(&pb.FileChunk{Hash: hashs[blockIdx]}, nil) {
 						return
 					}
 					
@@ -94,7 +103,7 @@ func HashMatch(ctx context.Context, head *filesync.HashHead, srcFile *file.File)
 				}
 			}
 			
-			plog.Debugf("No match found for offset=%d", offset)
+			plog.Debugf("No match found for offset: %d", offset)
 			notMatchData = append(notMatchData, buf[0])
 			yieldNotMatchData(false, yield)
 			
@@ -120,4 +129,12 @@ func HashMatch(ctx context.Context, head *filesync.HashHead, srcFile *file.File)
 	}
 	
 	return matchIter, nil
+}
+
+func GetHashMap(head *pb.HashHead) map[uint32]int64 {
+	hashMap := make(map[uint32]int64)
+	for _, sum := range head.GetHashs() {
+		hashMap[sum.GetSum1()] = sum.GetIndex()
+	}
+	return hashMap
 }

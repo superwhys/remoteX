@@ -1,11 +1,3 @@
-// File:		adler.go
-// Created by:	Hoven
-// Created on:	2024-10-12
-//
-// This file is part of the Example Project.
-//
-// (c) 2024 Example Corp. All rights reserved.
-
 package hash
 
 const (

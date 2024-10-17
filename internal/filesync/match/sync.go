@@ -1,6 +1,7 @@
 package match
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"iter"
@@ -10,35 +11,42 @@ import (
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/internal/filesync/file"
+	"github.com/superwhys/remoteX/internal/filesync/pb"
 )
 
-func SyncFileToWriter(matchIter iter.Seq2[*chunk, error], target *file.File, writer io.Writer) error {
+func SyncFileToWriter(ctx context.Context, matchIter iter.Seq2[*pb.FileChunk, error], target *file.File, writer io.Writer) error {
 	for matchChunk, err := range matchIter {
 		if err != nil {
 			return errors.Wrap(err, "iter file match")
 		}
 		
 		var data []byte
-		if matchChunk.hash != nil {
-			offset := matchChunk.hash.GetOffset()
-			data, err = file.ReadFileAtOffset(target, offset, matchChunk.hash.GetLen())
+		if matchChunk.GetHash() != nil {
+			offset := matchChunk.Hash.GetOffset()
+			data, err = file.ReadFileAtOffset(target, offset, matchChunk.Hash.GetLen())
 			if err != nil {
 				return errors.Wrap(err, "read file at offset")
 			}
 		} else {
-			data = matchChunk.data
+			data = matchChunk.GetData()
 		}
 		
 		_, err := writer.Write(data)
 		if err != nil {
 			return errors.Wrap(err, "write to Writer")
 		}
+		
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 	}
 	
 	return nil
 }
 
-func SyncFile(matchIter iter.Seq2[*chunk, error], target *file.File) (err error) {
+func SyncFile(ctx context.Context, matchIter iter.Seq2[*pb.FileChunk, error], target *file.File) (err error) {
 	path := target.Name()
 	baseName := filepath.Base(path)
 	tmpPath := filepath.Join(filepath.Dir(path), fmt.Sprintf("tmp-%s", baseName))
@@ -69,7 +77,7 @@ func SyncFile(matchIter iter.Seq2[*chunk, error], target *file.File) (err error)
 		target.Update(f)
 	}()
 	
-	err = SyncFileToWriter(matchIter, target, tmpFile)
+	err = SyncFileToWriter(ctx, matchIter, target, tmpFile)
 	if err != nil {
 		return errors.Wrap(err, "sync file to Writer")
 	}

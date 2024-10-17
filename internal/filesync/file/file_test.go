@@ -1,4 +1,4 @@
-package filesync
+package file
 
 import (
 	"fmt"
@@ -8,11 +8,12 @@ import (
 	
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/stretchr/testify/assert"
+	"github.com/superwhys/remoteX/internal/filesync/pb"
 )
 
 func TestGetFileList(t *testing.T) {
-	packListFn := func(root string) (*FileList, error) {
-		var list FileList
+	packListFn := func(root string) (*pb.FileList, error) {
+		var list pb.FileList
 		strip := filepath.Dir(filepath.Clean(root)) + "/"
 		if strings.HasSuffix(root, "/") {
 			strip = filepath.Clean(root) + "/"
@@ -21,7 +22,7 @@ func TestGetFileList(t *testing.T) {
 		
 		list.Strip = strip
 		
-		for f := range GetFileList(root) {
+		for f := range GetFileList(strip, root) {
 			list.Files = append(list.Files, f)
 			list.TotalSize += f.GetSize()
 		}
@@ -46,5 +47,4 @@ func TestGetFileList(t *testing.T) {
 		assert.Nil(t, err)
 		t.Log(plog.Jsonify(fileList))
 	})
-	
 }

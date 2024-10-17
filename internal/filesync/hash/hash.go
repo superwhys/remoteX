@@ -8,24 +8,21 @@ import (
 	"os"
 	
 	"github.com/go-puzzles/puzzles/plog"
-	"github.com/superwhys/remoteX/internal/filesync"
+	"github.com/superwhys/remoteX/internal/filesync/common"
+	"github.com/superwhys/remoteX/internal/filesync/pb"
 )
 
-const blockSize = 64
-
-func CalcHashHead(contentLen int64) *filesync.HashHead {
+func CalcHashHead(contentLen int64) *pb.HashHead {
 	blockLength := int64(math.Sqrt(float64(contentLen)))
-	if blockLength < blockSize {
-		blockLength = blockSize
+	if blockLength < common.BlockSize {
+		blockLength = common.BlockSize
 	}
 	
-	const checkSumLength = 32
-	
-	return &filesync.HashHead{
+	return &pb.HashHead{
 		CheckSumCount:   (contentLen + (int64(blockLength) - 1)) / int64(blockLength),
 		RemainderLength: contentLen % int64(blockLength),
 		BlockLength:     blockLength,
-		CheckSumLength:  checkSumLength,
+		CheckSumLength:  common.CheckSumLength,
 	}
 }
 
@@ -42,12 +39,12 @@ type FileChunk struct {
 	b        []byte
 }
 
-func CalcFileSubHash(head *filesync.HashHead, fileLen int64, in *os.File) iter.Seq[*filesync.HashBuf] {
-	return func(yield func(*filesync.HashBuf) bool) {
+func CalcFileSubHash(head *pb.HashHead, fileLen int64, in *os.File) iter.Seq[*pb.HashBuf] {
+	return func(yield func(*pb.HashBuf) bool) {
 		for fc := range splitFileChunk(head.BlockLength, fileLen, head.CheckSumCount, in) {
 			sum1 := CheckAdlerSum(fc.b)
 			sum2 := CheckHashSum(fc.b)
-			hb := &filesync.HashBuf{
+			hb := &pb.HashBuf{
 				Index:  fc.chunkIdx,
 				Offset: fc.offset,
 				Sum1:   sum1,

@@ -1,21 +1,18 @@
-// File:		File.go
-// Created by:	Hoven
-// Created on:	2024-10-11
-//
-// This File is part of the Example Project.
-//
-// (c) 2024 Example Corp. All rights reserved.
-
 package file
 
 import (
 	"crypto/md5"
 	"io"
+	"io/fs"
+	"iter"
 	"os"
+	"path/filepath"
+	"strings"
 	
+	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
-	"github.com/superwhys/remoteX/internal/filesync"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
+	"github.com/superwhys/remoteX/internal/filesync/pb"
 )
 
 type File struct {
@@ -24,6 +21,17 @@ type File struct {
 
 func OpenFile(path string) (*File, error) {
 	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	
+	return &File{
+		file: f,
+	}, nil
+}
+
+func CreateFile(path string) (*File, error) {
+	f, err := os.Create(path)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +114,7 @@ func ReadFileAtOffset(file *File, offset int64, length int64) ([]byte, error) {
 	return buffer[:n], nil
 }
 
-func ReadFileBuf(f *File, fileSize, offset int64, head *filesync.HashHead) (buf []byte, sum uint32, blockLength int64, err error) {
+func ReadFileBuf(f *File, fileSize, offset int64, head *pb.HashHead) (buf []byte, sum uint32, blockLength int64, err error) {
 	blockLength = head.GetBlockLength()
 	if remaining := fileSize - offset; remaining < blockLength {
 		blockLength = remaining
@@ -118,4 +126,46 @@ func ReadFileBuf(f *File, fileSize, offset int64, head *filesync.HashHead) (buf 
 	}
 	sum = hash.CheckAdlerSum(buf)
 	return buf, sum, blockLength, nil
+}
+
+func GetFileList(strip, root string) iter.Seq[*pb.FileBase] {
+	ch := make(chan *pb.FileBase)
+	go func() {
+		filepath.Walk(root, func(path string, info fs.FileInfo, err error) error {
+			if err != nil {
+				plog.Errorf("filepath walk error: %v", err)
+				return err
+			}
+			if path == root && info.IsDir() {
+				return nil
+			}
+			
+			name := strings.TrimPrefix(path, strip)
+			if name == root {
+				name = "."
+			}
+			
+			size := info.Size()
+			
+			f := &pb.FileBase{
+				Name:    name,
+				Regular: info.Mode().IsRegular(),
+				Wpath:   name,
+				Size:    size,
+			}
+			ch <- f
+			
+			return nil
+		})
+		
+		close(ch)
+	}()
+	
+	return func(yield func(*pb.FileBase) bool) {
+		for f := range ch {
+			if !yield(f) {
+				break
+			}
+		}
+	}
 }

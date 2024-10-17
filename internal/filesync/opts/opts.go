@@ -5,5 +5,10 @@ type SyncOpt struct {
 	DryRun bool
 }
 
-func (opts *SyncOpt) UpdateOpt() {
+func (opts *SyncOpt) SetDefault() *SyncOpt {
+	if opts == nil {
+		opts = &SyncOpt{}
+	}
+
+	return opts
 }

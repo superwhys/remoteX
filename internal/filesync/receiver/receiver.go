@@ -2,50 +2,29 @@ package receiver
 
 import (
 	"context"
+	"iter"
 	"os"
 	"path/filepath"
 	
 	"github.com/pkg/errors"
-	"github.com/superwhys/remoteX/internal/filesync"
+	"github.com/superwhys/remoteX/internal/filesync/common"
 	"github.com/superwhys/remoteX/internal/filesync/file"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
+	"github.com/superwhys/remoteX/internal/filesync/match"
 	"github.com/superwhys/remoteX/internal/filesync/opts"
+	"github.com/superwhys/remoteX/internal/filesync/pb"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
-type FileReceiver interface {
-	ReceiveFile(ctx context.Context, rw protoutils.ProtoMessageReadWriter, dest string, opts *opts.SyncOpt) error
+type ReceiveTransfer struct {
+	Opts      *opts.SyncOpt
+	Dest      string
+	DestIsDir bool
+	Rw        protoutils.ProtoMessageReadWriter
 }
 
-type Receiver struct{}
-
-func (r *Receiver) ReceiveFile(ctx context.Context, rw protoutils.ProtoMessageReadWriter, dest string, opts *opts.SyncOpt) error {
-	rt := &receiveTransfer{
-		opts: opts,
-		dest: dest,
-		rw:   rw,
-	}
-	// TODO: 1. receive filelist
-	fileList, err := rt.receiveFileList(ctx)
-	if err != nil {
-		return errors.Wrap(err, "receiveFileList")
-	}
-	_ = fileList
-	// 2. generate each file sum and send
-	
-	// 3. receive file
-	
-	return nil
-}
-
-type receiveTransfer struct {
-	opts *opts.SyncOpt
-	dest string
-	rw   protoutils.ProtoMessageReadWriter
-}
-
-func (rt *receiveTransfer) receiveFileList(ctx context.Context) (*filesync.FileList, error) {
-	var fileList filesync.FileList
+func (rt *ReceiveTransfer) ReceiveFileList(ctx context.Context) (*pb.FileList, error) {
+	var fileList pb.FileList
 	for {
 		select {
 		case <-ctx.Done():
@@ -53,8 +32,8 @@ func (rt *receiveTransfer) receiveFileList(ctx context.Context) (*filesync.FileL
 		default:
 		}
 		
-		f := &filesync.FileBase{}
-		if err := rt.rw.ReadMessage(f); err != nil {
+		f := &pb.FileBase{}
+		if err := rt.Rw.ReadMessage(f); err != nil {
 			return nil, err
 		}
 		
@@ -73,48 +52,92 @@ func (rt *receiveTransfer) receiveFileList(ctx context.Context) (*filesync.FileL
 	return &fileList, nil
 }
 
-func (rt *receiveTransfer) generateFilesHash(ctx context.Context, fileList *filesync.FileList) error {
-	for idx, f := range fileList.Files {
-		if err := rt.calcFileHashAndSend(ctx, int64(idx), f); err != nil {
-			return errors.Wrapf(err, "calculate file hash: %s", f.GetPath())
-		}
+func (rt *ReceiveTransfer) CalcFileHashAndSend(ctx context.Context, f *pb.FileBase) (exists bool, err error) {
+	var local string
+	if rt.DestIsDir {
+		local = filepath.Join(rt.Dest, f.GetName())
+	} else {
+		local = rt.Dest
 	}
-	
-	return nil
-}
-
-func (rt *receiveTransfer) calcFileHashAndSend(ctx context.Context, idx int64, f *filesync.FileBase) error {
-	local := filepath.Join(rt.dest, f.Name())
 	st, err := os.Stat(local)
 	if os.IsNotExist(err) {
-		// TODO: need whole file
-		
+		// need whole file
+		return false, rt.Rw.WriteMessage(&pb.HashHead{
+			BlockLength: int64(common.BlockSize),
+		})
 	} else if err != nil {
-		return err
+		return false, err
 	}
 	
 	in, err := file.OpenFile(local)
 	if err != nil {
-		return errors.Wrapf(err, "openFile: %s", local)
+		return false, errors.Wrapf(err, "openFile: %s", local)
 	}
 	fileLen := st.Size()
 	
-	// 1. write idx
-	if err := rt.rw.WriteMessage(&filesync.FileIdx{Idx: idx}); err != nil {
-		return errors.Wrapf(err, "sendFileIdx: %s", local)
-	}
-	
-	// 2. calc hash
 	head := hash.CalcHashHead(fileLen)
-	if err := rt.rw.WriteMessage(head); err != nil {
-		return err
+	if err := rt.Rw.WriteMessage(head); err != nil {
+		return false, err
 	}
 	
 	for hb := range hash.CalcFileSubHash(head, fileLen, in.File()) {
-		if err := rt.rw.WriteMessage(hb); err != nil {
-			return errors.Wrap(err, "sendHashBuf")
+		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
+		default:
+		}
+		
+		if err := rt.Rw.WriteMessage(hb); err != nil {
+			return false, errors.Wrap(err, "sendHashBuf")
 		}
 	}
 	
-	return nil
+	return true, nil
+}
+
+func (rt *ReceiveTransfer) receiveFileChunkIter(ctx context.Context) (matchIter iter.Seq2[*pb.FileChunk, error]) {
+	return func(yield func(*pb.FileChunk, error) bool) {
+		for {
+			var fileChunk pb.FileChunk
+			if err := rt.Rw.ReadMessage(&fileChunk); err != nil {
+				yield(nil, errors.Wrapf(err, "readFileChunk"))
+				return
+			}
+			
+			if fileChunk.GetIsEnd() || !yield(&fileChunk, nil) {
+				return
+			}
+			
+			select {
+			case <-ctx.Done():
+				yield(nil, ctx.Err())
+				return
+			default:
+			}
+		}
+	}
+}
+
+func (rt *ReceiveTransfer) TransferFile(ctx context.Context, fileExists bool, dest string, fb *pb.FileBase) (err error) {
+	var (
+		target     *file.File
+		targetPath string
+	)
+	if rt.DestIsDir {
+		targetPath = filepath.Join(dest, fb.GetName())
+	} else {
+		targetPath = dest
+	}
+	
+	if !fileExists {
+		target, err = file.CreateFile(targetPath)
+	} else {
+		target, err = file.OpenFile(targetPath)
+	}
+	if err != nil {
+		return errors.Wrap(err, "openFile")
+	}
+	
+	matchIter := rt.receiveFileChunkIter(ctx)
+	return match.SyncFile(ctx, matchIter, target)
 }

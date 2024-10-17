@@ -1,11 +1,3 @@
-// File:		receiver_test.go
-// Created by:	Hoven
-// Created on:	2024-10-11
-//
-// This file is part of the Example Project.
-//
-// (c) 2024 Example Corp. All rights reserved.
-
 package receiver
 
 import (
@@ -41,12 +33,7 @@ func TestCalcFileSubHash(t *testing.T) {
 		return tmpFile, nil
 	}
 	
-	t.Run("smallFile", func(t *testing.T) {
-		size := 10 * 1024 * 1024 // 10MB
-		f, err := tempFileCreate(size)
-		if !assert.Nil(t, err) {
-			return
-		}
+	calc := func(f *os.File, size int) {
 		defer os.Remove(f.Name())
 		
 		in, err := file.OpenFile(f.Name())
@@ -61,5 +48,32 @@ func TestCalcFileSubHash(t *testing.T) {
 		}
 		
 		assert.Equal(t, head.CheckSumCount, int64(totalBlock))
+	}
+	
+	t.Run("10MFile", func(t *testing.T) {
+		size := 10 * 1024 * 1024 // 10MB
+		f, err := tempFileCreate(size)
+		if !assert.Nil(t, err) {
+			return
+		}
+		calc(f, size)
+	})
+	
+	t.Run("500MFile", func(t *testing.T) {
+		size := 500 * 1024 * 1024 // 500MB
+		f, err := tempFileCreate(size)
+		if !assert.Nil(t, err) {
+			return
+		}
+		calc(f, size)
+	})
+	
+	t.Run("1024MFile", func(t *testing.T) {
+		size := 1024 * 1024 * 1024 // 1G
+		f, err := tempFileCreate(size)
+		if !assert.Nil(t, err) {
+			return
+		}
+		calc(f, size)
 	})
 }
