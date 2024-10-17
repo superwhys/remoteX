@@ -24,7 +24,7 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Println(path, "returned:", matches)
-		
+
 		args := []string{
 			"-I", "..",
 			"-I", ".",
@@ -36,7 +36,7 @@ func main() {
 		cmd := exec.Command("protoc", args...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		
+
 		if err := cmd.Run(); err != nil {
 			log.Fatal("Failed generating", path)
 		}

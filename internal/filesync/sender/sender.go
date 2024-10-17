@@ -3,10 +3,9 @@ package sender
 import (
 	"context"
 	"path/filepath"
-	"strings"
-	
+
+	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
-	"github.com/superwhys/remoteX/internal/filesync"
 	"github.com/superwhys/remoteX/internal/filesync/opts"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
@@ -18,58 +17,53 @@ type FileSender interface {
 type Sender struct{}
 
 func (s *Sender) SendFiles(ctx context.Context, rw protoutils.ProtoMessageReadWriter, path string, opts *opts.SyncOpt) (err error) {
-	
 	st := &sendTransfer{
 		opts: opts,
 		rw:   rw,
 	}
-	// TODO: 1. send whole file list
+
 	fileList, err := st.sendFileList(ctx, path)
 	if err != nil {
 		return errors.Wrap(err, "sendFileList")
 	}
-	_ = fileList
-	// 2. receive client process file idx
-	// 3. receive client file sums
-	
+
+	for {
+		// receive client process file idx
+		fileIdx, err := st.receiveFileIdx()
+		if err != nil {
+			return errors.Wrap(err, "receiveFileIdx")
+		}
+		if fileIdx.GetIdx() == -1 {
+			break
+		}
+
+		file := fileList.GetFiles()[fileIdx.GetIdx()]
+		plog.Infof("receive file idx %d, fileName: %s", fileIdx.GetIdx(), file.Name())
+		if opts.DryRun {
+			continue
+		}
+
+		// receive client file sums
+		head, err := st.receiveHeadSum()
+		if err != nil {
+			return errors.Wrap(err, "receiveHeadSum")
+		}
+		plog.Debugf("receive head hash sun count: %d", len(head.GetHashs()))
+
+		// transfer file
+		srcPath := filepath.Join(fileList.GetStrip(), file.GetPath())
+		if len(head.GetHashs()) == 0 {
+			plog.Debugf("head hashs is empty, need whole file")
+			// send whole file list
+			err = st.sendFile(ctx, head.GetBlockLength(), file.GetSize(), srcPath)
+		} else {
+			err = st.hashMatch(ctx, head, srcPath)
+		}
+
+		if err != nil {
+			return errors.Wrapf(err, "transfer file: %s", srcPath)
+		}
+	}
+
 	return nil
-}
-
-type sendTransfer struct {
-	opts *opts.SyncOpt
-	rw   protoutils.ProtoMessageReadWriter
-}
-
-func (st *sendTransfer) sendFileList(ctx context.Context, root string) (*filesync.FileList, error) {
-	var fileList filesync.FileList
-	
-	strip := filepath.Dir(filepath.Clean(root)) + "/"
-	if strings.HasSuffix(root, "/") {
-		strip = filepath.Clean(root) + "/"
-	}
-	
-	fileList.Strip = strip
-	
-	for f := range filesync.GetFileList(root) {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-		
-		fileList.Files = append(fileList.Files, f)
-		fileList.TotalSize += f.GetSize()
-		
-		if err := st.rw.WriteMessage(f); err != nil {
-			return nil, errors.Wrapf(err, "write file: %s", f.GetPath())
-		}
-	}
-	
-	fileList.Sort()
-	
-	if err := st.rw.WriteMessage(&filesync.FileBase{IsEnd: true}); err != nil {
-		return nil, errors.Wrap(err, "write end")
-	}
-	
-	return &fileList, nil
 }

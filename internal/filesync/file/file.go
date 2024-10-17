@@ -12,7 +12,7 @@ import (
 	"crypto/md5"
 	"io"
 	"os"
-	
+
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/internal/filesync"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
@@ -27,7 +27,18 @@ func OpenFile(path string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
+	return &File{
+		file: f,
+	}, nil
+}
+
+func CreateFile(path string) (*File, error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, err
+	}
+
 	return &File{
 		file: f,
 	}, nil
@@ -67,7 +78,7 @@ func (f *File) CurrentSeek() (int64, error) {
 
 func (f *File) MD5() ([]byte, error) {
 	m := md5.New()
-	
+
 	currentSeek, err := f.CurrentSeek()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get current seek")
@@ -78,11 +89,11 @@ func (f *File) MD5() ([]byte, error) {
 	if _, err := io.Copy(m, f.file); err != nil {
 		return nil, errors.Wrap(err, "failed to copy file")
 	}
-	
+
 	if _, err := f.file.Seek(currentSeek, io.SeekStart); err != nil {
 		return nil, errors.Wrap(err, "failed to restore seek")
 	}
-	
+
 	return m.Sum(nil), nil
 }
 
@@ -92,17 +103,17 @@ func (f *File) Close() error {
 
 func ReadFileAtOffset(file *File, offset int64, length int64) ([]byte, error) {
 	buffer := make([]byte, length)
-	
+
 	_, err := file.Seek(offset, 0)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	n, err := file.Read(buffer)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return buffer[:n], nil
 }
 
@@ -111,7 +122,7 @@ func ReadFileBuf(f *File, fileSize, offset int64, head *filesync.HashHead) (buf 
 	if remaining := fileSize - offset; remaining < blockLength {
 		blockLength = remaining
 	}
-	
+
 	buf, err = ReadFileAtOffset(f, offset, blockLength)
 	if err != nil {
 		return nil, 0, 0, errors.Wrapf(err, "ReadFileAtOffset(%v-%v)", offset, blockLength)

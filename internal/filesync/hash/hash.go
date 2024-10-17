@@ -6,21 +6,25 @@ import (
 	"iter"
 	"math"
 	"os"
-	
+
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/superwhys/remoteX/internal/filesync"
 )
 
 const blockSize = 64
 
+func GetDefaultBlockSize() int {
+	return blockSize
+}
+
 func CalcHashHead(contentLen int64) *filesync.HashHead {
 	blockLength := int64(math.Sqrt(float64(contentLen)))
 	if blockLength < blockSize {
 		blockLength = blockSize
 	}
-	
+
 	const checkSumLength = 32
-	
+
 	return &filesync.HashHead{
 		CheckSumCount:   (contentLen + (int64(blockLength) - 1)) / int64(blockLength),
 		RemainderLength: contentLen % int64(blockLength),
@@ -31,7 +35,7 @@ func CalcHashHead(contentLen int64) *filesync.HashHead {
 
 func CheckHashSum(buf []byte) []byte {
 	hash := sha256.New()
-	
+
 	hash.Write(buf)
 	return hash.Sum(nil)
 }
@@ -58,7 +62,7 @@ func CalcFileSubHash(head *filesync.HashHead, fileLen int64, in *os.File) iter.S
 			} else {
 				hb.Len = int64(head.BlockLength)
 			}
-			
+
 			if !yield(hb) {
 				break
 			}
@@ -71,26 +75,26 @@ func splitFileChunk(blockLen, fileLen, chunkCnt int64, in *os.File) iter.Seq[*Fi
 		buf := make([]byte, int(blockLen))
 		remaining := fileLen
 		var offset int64
-		
+
 		for i := int64(0); i < chunkCnt; i++ {
 			n1 := min(blockLen, remaining)
 			b := buf[:n1]
-			
+
 			if _, err := io.ReadFull(in, b); err != nil {
 				plog.Errorf("read File: %v block error. idx: %v, offset: %v err: %v", in.Name(), i, offset, err)
 				break
 			}
-			
+
 			fc := &FileChunk{
 				chunkIdx: i,
 				offset:   offset,
 				b:        b,
 			}
-			
+
 			if !yield(fc) {
 				break
 			}
-			
+
 			remaining -= n1
 			offset += n1
 		}

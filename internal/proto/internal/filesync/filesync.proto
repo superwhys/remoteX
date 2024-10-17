@@ -44,3 +44,9 @@ message HashHead {
 
 	repeated HashBuf hashs = 5 [(ext.nullable) = true]; 
 }
+
+message FileChunk {
+	HashBuf hash = 1 [(ext.nullable) = true];
+	bytes data = 2;
+	bool is_end = 3;
+}
