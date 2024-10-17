@@ -10,12 +10,13 @@ package match
 
 import (
 	"context"
+	"crypto/md5"
 	"os"
 	"slices"
 	"testing"
 	
 	"github.com/stretchr/testify/assert"
-	file2 "github.com/superwhys/remoteX/internal/filesync/file"
+	"github.com/superwhys/remoteX/internal/filesync/file"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
 )
 
@@ -45,25 +46,25 @@ func tempFileCreate(size int) (string, error) {
 func TestFileHashMatch(t *testing.T) {
 	target := "./content/test.txt"
 	source := "./content/src.txt"
-	file, err := file2.OpenFile(target)
+	targetFile, err := file.OpenFile(target)
 	if !assert.Nil(t, err) {
 		return
 	}
-	defer file.Close()
-	src, err := file2.OpenFile(source)
+	defer targetFile.Close()
+	src, err := file.OpenFile(source)
 	if !assert.Nil(t, err) {
 		return
 	}
 	defer src.Close()
 	
-	fi, err := file.Stat()
+	fi, err := targetFile.Stat()
 	if !assert.Nil(t, err) {
 		return
 	}
 	size := fi.Size()
 	
 	head := hash.CalcHashHead(size)
-	head.Hashs = slices.Collect(hash.CalcFileSubHash(head, size, file.File()))
+	head.Hashs = slices.Collect(hash.CalcFileSubHash(head, size, targetFile.File()))
 	
 	// In actual, matchIter data should be transmitted back to the client
 	matchIter, err := HashMatch(context.Background(), head, src)
@@ -72,23 +73,18 @@ func TestFileHashMatch(t *testing.T) {
 	}
 	
 	// In actual, The client received the chunks transmitted by the server's matchIter
-	// and concatenated them into a complete file based on the chunks
-	err = SyncFile(matchIter, file)
+	// and concatenated them into a complete targetFile based on the chunks
+	md5Hash := md5.New()
+	err = SyncFileToWriter(matchIter, targetFile, md5Hash)
 	if !assert.Nil(t, err) {
 		return
 	}
 	
-	// md5Hash := md5.New()
-	// err = SyncFileToWriter(matchIter, file, md5Hash)
-	// if !assert.Nil(t, err) {
-	// 	return
-	// }
+	srcMd5, err := src.MD5()
+	if !assert.Nil(t, err) {
+		return
+	}
 	
-	// md5Hash = md5.New()
-	// sf, _ := os.Open(source)
-	// io.Copy(md5Hash, sf)
-	
-	// targetHash := md5Hash.Sum(nil)
-	// finalHash := md5Hash.Sum(nil)
-	// assert.Equal(t, targetHash, finalHash)
+	finalHash := md5Hash.Sum(nil)
+	assert.Equal(t, srcMd5, finalHash)
 }
