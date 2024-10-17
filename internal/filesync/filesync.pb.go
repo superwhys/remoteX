@@ -24,11 +24,11 @@ var _ = math.Inf
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type FileBase struct {
-	Path    string `protobuf:"bytes,1,opt,name=path,proto3" json:"path" yaml:"-"`
-	Wpath   string `protobuf:"bytes,2,opt,name=wpath,proto3" json:"wpath" yaml:"-"`
-	Regular bool   `protobuf:"varint,3,opt,name=regular,proto3" json:"regular" yaml:"-"`
-	Size    int64  `protobuf:"varint,4,opt,name=size,proto3" json:"size" yaml:"-"`
-	IsEnd   bool   `protobuf:"varint,5,opt,name=is_end,json=isEnd,proto3" json:"isEnd" yaml:"-"`
+	Path    string `protobuf:"bytes,1,opts,name=path,proto3" json:"path" yaml:"-"`
+	Wpath   string `protobuf:"bytes,2,opts,name=wpath,proto3" json:"wpath" yaml:"-"`
+	Regular bool   `protobuf:"varint,3,opts,name=regular,proto3" json:"regular" yaml:"-"`
+	Size    int64  `protobuf:"varint,4,opts,name=size,proto3" json:"size" yaml:"-"`
+	IsEnd   bool   `protobuf:"varint,5,opts,name=is_end,json=isEnd,proto3" json:"isEnd" yaml:"-"`
 }
 
 func (m *FileBase) Reset()         { *m = FileBase{} }
@@ -100,8 +100,8 @@ func (m *FileBase) GetIsEnd() bool {
 }
 
 type FileList struct {
-	TotalSize int64       `protobuf:"varint,1,opt,name=total_size,json=totalSize,proto3" json:"totalSize" yaml:"-"`
-	Strip     string      `protobuf:"bytes,2,opt,name=strip,proto3" json:"strip" yaml:"-"`
+	TotalSize int64       `protobuf:"varint,1,opts,name=total_size,json=totalSize,proto3" json:"totalSize" yaml:"-"`
+	Strip     string      `protobuf:"bytes,2,opts,name=strip,proto3" json:"strip" yaml:"-"`
 	Files     []*FileBase `protobuf:"bytes,3,rep,name=files,proto3" json:"files" yaml:"-"`
 }
 
@@ -160,7 +160,7 @@ func (m *FileList) GetFiles() []*FileBase {
 }
 
 type FileIdx struct {
-	Idx int64 `protobuf:"varint,1,opt,name=idx,proto3" json:"idx" yaml:"-"`
+	Idx int64 `protobuf:"varint,1,opts,name=idx,proto3" json:"idx" yaml:"-"`
 }
 
 func (m *FileIdx) Reset()         { *m = FileIdx{} }
@@ -204,11 +204,11 @@ func (m *FileIdx) GetIdx() int64 {
 }
 
 type HashBuf struct {
-	Offset int64  `protobuf:"varint,1,opt,name=offset,proto3" json:"offset" yaml:"-"`
-	Len    int64  `protobuf:"varint,2,opt,name=len,proto3" json:"len" yaml:"-"`
-	Index  int64  `protobuf:"varint,3,opt,name=index,proto3" json:"index" yaml:"-"`
-	Sum1   uint32 `protobuf:"varint,4,opt,name=sum1,proto3" json:"sum1" yaml:"-"`
-	Sum2   []byte `protobuf:"bytes,5,opt,name=sum2,proto3" json:"sum2" yaml:"-"`
+	Offset int64  `protobuf:"varint,1,opts,name=offset,proto3" json:"offset" yaml:"-"`
+	Len    int64  `protobuf:"varint,2,opts,name=len,proto3" json:"len" yaml:"-"`
+	Index  int64  `protobuf:"varint,3,opts,name=index,proto3" json:"index" yaml:"-"`
+	Sum1   uint32 `protobuf:"varint,4,opts,name=sum1,proto3" json:"sum1" yaml:"-"`
+	Sum2   []byte `protobuf:"bytes,5,opts,name=sum2,proto3" json:"sum2" yaml:"-"`
 }
 
 func (m *HashBuf) Reset()         { *m = HashBuf{} }
@@ -281,12 +281,12 @@ func (m *HashBuf) GetSum2() []byte {
 
 type HashHead struct {
 	// number of blocks
-	CheckSumCount int64 `protobuf:"varint,1,opt,name=check_sum_count,json=checkSumCount,proto3" json:"checkSumCount" yaml:"-"`
+	CheckSumCount int64 `protobuf:"varint,1,opts,name=check_sum_count,json=checkSumCount,proto3" json:"checkSumCount" yaml:"-"`
 	// block length in the file
-	BlockLength    int64 `protobuf:"varint,2,opt,name=block_length,json=blockLength,proto3" json:"blockLength" yaml:"-"`
-	CheckSumLength int64 `protobuf:"varint,3,opt,name=check_sum_length,json=checkSumLength,proto3" json:"checkSumLength" yaml:"-"`
+	BlockLength    int64 `protobuf:"varint,2,opts,name=block_length,json=blockLength,proto3" json:"blockLength" yaml:"-"`
+	CheckSumLength int64 `protobuf:"varint,3,opts,name=check_sum_length,json=checkSumLength,proto3" json:"checkSumLength" yaml:"-"`
 	// RemainderLength is fileLength % BlockLength
-	RemainderLength int64      `protobuf:"varint,4,opt,name=remainder_length,json=remainderLength,proto3" json:"remainderLength" yaml:"-"`
+	RemainderLength int64      `protobuf:"varint,4,opts,name=remainder_length,json=remainderLength,proto3" json:"remainderLength" yaml:"-"`
 	Hashs           []*HashBuf `protobuf:"bytes,5,rep,name=hashs,proto3" json:"hashs" yaml:"-"`
 }
 

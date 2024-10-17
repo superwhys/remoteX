@@ -1,4 +1,4 @@
-package filesync
+package opts
 
 type SyncOpt struct {
 	// DryRun 模拟运行，不会进行实际的文件传输
