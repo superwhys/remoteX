@@ -1,4 +1,4 @@
-package file
+package sender
 
 import (
 	"fmt"
@@ -13,6 +13,7 @@ import (
 
 func TestGetFileList(t *testing.T) {
 	packListFn := func(root string) (*pb.FileList, error) {
+		st := &SendTransfer{}
 		var list pb.FileList
 		strip := filepath.Dir(filepath.Clean(root)) + "/"
 		if strings.HasSuffix(root, "/") {
@@ -22,9 +23,9 @@ func TestGetFileList(t *testing.T) {
 		
 		list.Strip = strip
 		
-		for f := range GetFileList(strip, root) {
+		for f := range st.GetFileList(root) {
 			list.Files = append(list.Files, f)
-			list.TotalSize += f.GetSize()
+			list.TotalSize += f.GetEntry().GetSize()
 		}
 		
 		return &list, nil

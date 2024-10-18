@@ -7,14 +7,14 @@ import (
 	
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
-	"github.com/superwhys/remoteX/internal/filesync/file"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
 	"github.com/superwhys/remoteX/internal/filesync/pb"
+	"github.com/superwhys/remoteX/internal/filesystem"
 )
 
 // HashMatch is used to compare the HashHead transmitted from the client
 // with the source file from the server
-func HashMatch(ctx context.Context, head *pb.HashHead, srcFile *file.File) (matchIter iter.Seq2[*pb.FileChunk, error], err error) {
+func HashMatch(ctx context.Context, head *pb.HashHead, srcFile *filesystem.File) (matchIter iter.Seq2[*pb.FileChunk, error], err error) {
 	var (
 		buf         []byte
 		fileSize    int64
@@ -47,7 +47,7 @@ func HashMatch(ctx context.Context, head *pb.HashHead, srcFile *file.File) (matc
 		plog.Infof("HashSearch path=%s len(sums)=%d, srcFileSize=%d", srcFile.Name(), len(head.GetHashs()), fileSize)
 		
 		// read the first pb.FileChunk with offset: 0
-		if buf, sum, blockLength, err = file.ReadFileBuf(srcFile, fileSize, offset, head); err != nil {
+		if buf, sum, blockLength, err = ReadFileBuf(srcFile, fileSize, offset, head); err != nil {
 			yield(nil, err)
 			return
 		}
@@ -96,7 +96,7 @@ func HashMatch(ctx context.Context, head *pb.HashHead, srcFile *file.File) (matc
 						break Outer
 					}
 					
-					if buf, sum, blockLength, err = file.ReadFileBuf(srcFile, fileSize, offset, head); err != nil {
+					if buf, sum, blockLength, err = ReadFileBuf(srcFile, fileSize, offset, head); err != nil {
 						yield(nil, err)
 						return
 					}
@@ -118,7 +118,7 @@ func HashMatch(ctx context.Context, head *pb.HashHead, srcFile *file.File) (matc
 			if remaining := fileSize - offset; remaining < l {
 				l = remaining
 			}
-			buf, err = file.ReadFileAtOffset(srcFile, offset, l)
+			buf, err = filesystem.BasicFs.ReadFileAtOffset(srcFile, offset, l)
 			if err != nil {
 				yield(nil, errors.Wrapf(err, "ReadFileAtOffset(%v-%v)", offset, l))
 				return
@@ -137,4 +137,18 @@ func GetHashMap(head *pb.HashHead) map[uint32]int64 {
 		hashMap[sum.GetSum1()] = sum.GetIndex()
 	}
 	return hashMap
+}
+
+func ReadFileBuf(f *filesystem.File, fileSize, offset int64, head *pb.HashHead) (buf []byte, sum uint32, blockLength int64, err error) {
+	blockLength = head.GetBlockLength()
+	if remaining := fileSize - offset; remaining < blockLength {
+		blockLength = remaining
+	}
+	
+	buf, err = filesystem.BasicFs.ReadFileAtOffset(f, offset, blockLength)
+	if err != nil {
+		return nil, 0, 0, errors.Wrapf(err, "ReadFileAtOffset(%v-%v)", offset, blockLength)
+	}
+	sum = hash.CheckAdlerSum(buf)
+	return buf, sum, blockLength, nil
 }

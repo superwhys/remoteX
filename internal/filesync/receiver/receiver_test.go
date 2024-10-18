@@ -5,8 +5,8 @@ import (
 	"testing"
 	
 	"github.com/stretchr/testify/assert"
-	"github.com/superwhys/remoteX/internal/filesync/file"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
+	"github.com/superwhys/remoteX/internal/filesystem"
 )
 
 func TestCalcFileSubHash(t *testing.T) {
@@ -36,7 +36,7 @@ func TestCalcFileSubHash(t *testing.T) {
 	calc := func(f *os.File, size int) {
 		defer os.Remove(f.Name())
 		
-		in, err := file.OpenFile(f.Name())
+		in, err := filesystem.BasicFs.OpenFile(f.Name())
 		if !assert.Nil(t, err) {
 			return
 		}

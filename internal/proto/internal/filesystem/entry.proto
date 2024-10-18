@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package entry;
+package filesystem;
 
 import "ext.proto";
 
@@ -21,7 +21,8 @@ message Entry {
   string accessed_time = 7 [(ext.json) = "accessed_time,omitempty"];
   string owner = 8 [(ext.json) = "owner,omitempty"];
   string permissions = 9 [(ext.json) = "permissions,omitempty"];
-  repeated Entry children = 10 [(ext.json) = "children,omitempty", (ext.nullable) = true];
+  bool regular = 10;
+  repeated Entry children = 11 [(ext.json) = "children,omitempty", (ext.nullable) = true];
 }
 
 message ListResp {

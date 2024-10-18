@@ -1,4 +1,4 @@
-package fs
+package filesystem
 
 type FsError uint64
 

@@ -12,7 +12,7 @@ import (
 	"github.com/go-puzzles/puzzles/plog/level"
 	"github.com/stretchr/testify/assert"
 	"github.com/superwhys/remoteX/internal/filesync"
-	"github.com/superwhys/remoteX/internal/filesync/file"
+	"github.com/superwhys/remoteX/internal/filesystem"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 	"golang.org/x/sync/errgroup"
 )
@@ -90,11 +90,11 @@ func TestTransferWholeFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	
-	tempF, err := file.OpenFile(tmpFile)
+	tempF, err := filesystem.BasicFs.OpenFile(tmpFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetF, err := file.OpenFile(targetFile)
+	targetF, err := filesystem.BasicFs.OpenFile(targetFile)
 	if err != nil {
 		t.Fatal(err)
 	}

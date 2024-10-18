@@ -5,18 +5,19 @@ import (
 	
 	"github.com/gogo/protobuf/proto"
 	"github.com/superwhys/remoteX/domain/command"
-	"github.com/superwhys/remoteX/domain/command/filesystem"
-	"github.com/superwhys/remoteX/internal/fs"
+	"github.com/superwhys/remoteX/internal/filesystem"
 	"github.com/superwhys/remoteX/pkg/errorutils"
+	
+	fsDomain "github.com/superwhys/remoteX/domain/command/filesystem"
 )
 
 type ServiceImpl struct {
-	fs fs.FileSystem
+	fs filesystem.FileSystem
 }
 
-func NewFilesystemService() filesystem.Service {
+func NewFilesystemService() fsDomain.Service {
 	return &ServiceImpl{
-		fs: fs.NewBasicFileSystem(),
+		fs: filesystem.NewBasicFileSystem(),
 	}
 }
 
@@ -31,7 +32,7 @@ func (s *ServiceImpl) ListDir(_ context.Context, args command.Args) (proto.Messa
 		return nil, err
 	}
 	
-	return &fs.ListResp{
+	return &filesystem.ListResp{
 		Entries: entries,
 	}, nil
 }

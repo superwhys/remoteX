@@ -3,13 +3,11 @@ syntax = "proto3";
 package pb;
 
 import "ext.proto";
+import "internal/filesystem/entry.proto";
 
 message FileBase {
-		string name = 1;
-  	string wpath = 2;
-  	bool regular = 3;
-  	int64 size = 4;
-  	bool is_end = 5;
+		filesystem.Entry entry = 1 [(ext.nullable) = true];
+  	bool is_end = 2;
 }
 
 message FileList {

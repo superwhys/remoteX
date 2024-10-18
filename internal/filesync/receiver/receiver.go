@@ -8,11 +8,11 @@ import (
 	
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/internal/filesync/common"
-	"github.com/superwhys/remoteX/internal/filesync/file"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
 	"github.com/superwhys/remoteX/internal/filesync/match"
 	"github.com/superwhys/remoteX/internal/filesync/opts"
 	"github.com/superwhys/remoteX/internal/filesync/pb"
+	"github.com/superwhys/remoteX/internal/filesystem"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
@@ -42,8 +42,8 @@ func (rt *ReceiveTransfer) ReceiveFileList(ctx context.Context) (*pb.FileList, e
 		}
 		
 		fileList.Files = append(fileList.Files, f)
-		if f.Regular {
-			fileList.TotalSize += f.Size
+		if f.GetEntry().GetRegular() {
+			fileList.TotalSize += f.GetEntry().GetSize()
 		}
 	}
 	
@@ -55,7 +55,7 @@ func (rt *ReceiveTransfer) ReceiveFileList(ctx context.Context) (*pb.FileList, e
 func (rt *ReceiveTransfer) CalcFileHashAndSend(ctx context.Context, f *pb.FileBase) (exists bool, err error) {
 	var local string
 	if rt.DestIsDir {
-		local = filepath.Join(rt.Dest, f.GetName())
+		local = filepath.Join(rt.Dest, f.GetEntry().GetName())
 	} else {
 		local = rt.Dest
 	}
@@ -69,7 +69,7 @@ func (rt *ReceiveTransfer) CalcFileHashAndSend(ctx context.Context, f *pb.FileBa
 		return false, err
 	}
 	
-	in, err := file.OpenFile(local)
+	in, err := filesystem.BasicFs.OpenFile(local)
 	if err != nil {
 		return false, errors.Wrapf(err, "openFile: %s", local)
 	}
@@ -120,19 +120,19 @@ func (rt *ReceiveTransfer) receiveFileChunkIter(ctx context.Context) (matchIter 
 
 func (rt *ReceiveTransfer) TransferFile(ctx context.Context, fileExists bool, dest string, fb *pb.FileBase) (err error) {
 	var (
-		target     *file.File
+		target     *filesystem.File
 		targetPath string
 	)
 	if rt.DestIsDir {
-		targetPath = filepath.Join(dest, fb.GetName())
+		targetPath = filepath.Join(dest, fb.GetEntry().GetName())
 	} else {
 		targetPath = dest
 	}
 	
 	if !fileExists {
-		target, err = file.CreateFile(targetPath)
+		target, err = filesystem.BasicFs.CreateFile(targetPath)
 	} else {
-		target, err = file.OpenFile(targetPath)
+		target, err = filesystem.BasicFs.OpenFile(targetPath)
 	}
 	if err != nil {
 		return errors.Wrap(err, "openFile")

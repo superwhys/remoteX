@@ -2,15 +2,17 @@ package sender
 
 import (
 	"context"
+	"io/fs"
+	"iter"
 	"path/filepath"
 	"strings"
 	
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
-	"github.com/superwhys/remoteX/internal/filesync/file"
 	"github.com/superwhys/remoteX/internal/filesync/match"
 	"github.com/superwhys/remoteX/internal/filesync/opts"
 	"github.com/superwhys/remoteX/internal/filesync/pb"
+	"github.com/superwhys/remoteX/internal/filesystem"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
@@ -29,7 +31,7 @@ func (st *SendTransfer) SendFileList(ctx context.Context, root string) (*pb.File
 	
 	fileList.Strip = strip
 	
-	for f := range file.GetFileList(strip, root) {
+	for f := range st.GetFileList(root) {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -37,10 +39,10 @@ func (st *SendTransfer) SendFileList(ctx context.Context, root string) (*pb.File
 		}
 		
 		fileList.Files = append(fileList.Files, f)
-		fileList.TotalSize += f.GetSize()
+		fileList.TotalSize += f.GetEntry().GetSize()
 		
 		if err := st.Rw.WriteMessage(f); err != nil {
-			return nil, errors.Wrapf(err, "write file: %s", f.GetName())
+			return nil, errors.Wrapf(err, "write file: %s", f.GetEntry().GetName())
 		}
 	}
 	
@@ -92,7 +94,7 @@ func (st *SendTransfer) ReceiveHeadSum(ctx context.Context) (*pb.HashHead, error
 
 func (st *SendTransfer) SendFile(ctx context.Context, blockLength, fileSize int64, srcPath string) error {
 	plog.Debugf("start send whole file: %v", srcPath)
-	srcFile, err := file.OpenFile(srcPath)
+	srcFile, err := filesystem.BasicFs.OpenFile(srcPath)
 	if err != nil {
 		return errors.Wrapf(err, "open file: %s", srcPath)
 	}
@@ -113,7 +115,7 @@ func (st *SendTransfer) SendFile(ctx context.Context, blockLength, fileSize int6
 			l = fileSize - offset
 		}
 		
-		b, err := file.ReadFileAtOffset(srcFile, offset, l)
+		b, err := filesystem.BasicFs.ReadFileAtOffset(srcFile, offset, l)
 		if err != nil {
 			return errors.Wrapf(err, "read file at offset: %d", offset)
 		}
@@ -133,7 +135,7 @@ func (st *SendTransfer) SendFile(ctx context.Context, blockLength, fileSize int6
 }
 
 func (st *SendTransfer) HashMatch(ctx context.Context, head *pb.HashHead, srcPath string) error {
-	srcFile, err := file.OpenFile(srcPath)
+	srcFile, err := filesystem.BasicFs.OpenFile(srcPath)
 	if err != nil {
 		return errors.Wrapf(err, "open file: %s", srcPath)
 	}
@@ -155,4 +157,34 @@ func (st *SendTransfer) HashMatch(ctx context.Context, head *pb.HashHead, srcPat
 	}
 	
 	return st.Rw.WriteMessage(&pb.FileChunk{IsEnd: true})
+}
+
+func (st *SendTransfer) GetFileList(root string) iter.Seq[*pb.FileBase] {
+	filter := func(path string, info fs.FileInfo) bool {
+		if path == root && info.IsDir() {
+			return false
+		}
+		
+		info.Mode().IsRegular()
+		return true
+	}
+	
+	return func(yield func(*pb.FileBase) bool) {
+		walkIter, err := filesystem.BasicFs.WalkIter(root, filter)
+		if err != nil {
+			plog.Errorf("WalkIter error: %v", err)
+			return
+		}
+		for entry := range walkIter {
+			if entry.GetName() == root {
+				entry.Name = "."
+			}
+			
+			f := &pb.FileBase{
+				Entry: entry,
+			}
+			
+			yield(f)
+		}
+	}
 }

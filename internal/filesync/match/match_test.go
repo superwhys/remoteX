@@ -12,8 +12,8 @@ import (
 	"time"
 	
 	"github.com/stretchr/testify/assert"
-	"github.com/superwhys/remoteX/internal/filesync/file"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
+	"github.com/superwhys/remoteX/internal/filesystem"
 )
 
 func tempFileCreate(size int) (string, error) {
@@ -111,12 +111,12 @@ func TestFileHashMatch(t *testing.T) {
 		_ = os.Remove(source)
 	}()
 	
-	targetFile, err := file.OpenFile(target)
+	targetFile, err := filesystem.BasicFs.OpenFile(target)
 	if !assert.Nil(t, err) {
 		return
 	}
 	
-	src, err := file.OpenFile(source)
+	src, err := filesystem.BasicFs.OpenFile(source)
 	if !assert.Nil(t, err) {
 		return
 	}
