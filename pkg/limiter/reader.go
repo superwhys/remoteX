@@ -8,7 +8,7 @@ var _ io.Reader = (*LimitReader)(nil)
 
 type LimitReader struct {
 	waiter
-	reader io.Reader
+	reader io.ReadCloser
 }
 
 func (r *LimitReader) Read(p []byte) (n int, err error) {
@@ -16,6 +16,10 @@ func (r *LimitReader) Read(p []byte) (n int, err error) {
 	if !r.UnLimit() {
 		r.Take(n)
 	}
-	
+
 	return n, err
+}
+
+func (r *LimitReader) Close() error {
+	return r.reader.Close()
 }

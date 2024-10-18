@@ -7,7 +7,7 @@ import (
 )
 
 type CountingWriter struct {
-	io.Writer
+	Writer   io.WriteCloser
 	idString string
 	tot      atomic.Int64 // bytes
 	last     atomic.Int64 // unix nanos
@@ -25,6 +25,10 @@ func (c *CountingWriter) Tot() int64 { return c.tot.Load() }
 
 func (c *CountingWriter) Last() time.Time {
 	return time.Unix(0, c.last.Load())
+}
+
+func (c *CountingWriter) Close() error {
+	return c.Writer.Close()
 }
 
 func TotalInOut() (int64, int64) {

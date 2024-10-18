@@ -7,7 +7,7 @@ import (
 )
 
 type CountingReader struct {
-	io.Reader
+	Reader   io.ReadCloser
 	idString string
 	tot      atomic.Int64 // bytes
 	last     atomic.Int64 // unix nanos
@@ -25,4 +25,8 @@ func (c *CountingReader) Tot() int64 { return c.tot.Load() }
 
 func (c *CountingReader) Last() time.Time {
 	return time.Unix(0, c.last.Load())
+}
+
+func (c *CountingReader) Close() error {
+	return c.Reader.Close()
 }

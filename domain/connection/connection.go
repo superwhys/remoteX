@@ -148,6 +148,17 @@ func (l *LimiterStream) WriteMessage(m proto.Message) error {
 	return l.ProtoMessageWriter.WriteMessage(m)
 }
 
+func (l *LimiterStream) Close() (err error) {
+	err = l.ProtoMessageReader.Close()
+	err = l.ProtoMessageWriter.Close()
+	err = l.Stream.Close()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 var _ Stream = (*CounterStream)(nil)
 
 type CounterStream struct {
@@ -195,4 +206,8 @@ func (cc *CounterStream) WriteMessage(m proto.Message) error {
 	}()
 
 	return cc.ProtoMessageWriter.WriteMessage(m)
+}
+
+func (cc *CounterStream) Close() error {
+	return cc.Stream.Close()
 }

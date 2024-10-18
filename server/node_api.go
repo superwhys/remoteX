@@ -44,7 +44,7 @@ type listDirReq struct {
 
 func (s *RemoteXServer) listDir(c *gin.Context, req *listDirReq) {
 	cmd := &command.Command{Type: command.Listdir, Args: map[string]string{"path": req.Path}}
-	ret, err := s.commandService.DoCommand(c, cmd)
+	ret, err := s.commandService.DoCommand(c, cmd, nil)
 	if err != nil {
 		pgin.ReturnError(c, http.StatusInternalServerError, err.Error())
 		return

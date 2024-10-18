@@ -5,7 +5,7 @@ import "io"
 var _ io.Writer = (*LimitWriter)(nil)
 
 type LimitWriter struct {
-	writer io.Writer
+	writer io.WriteCloser
 	waiter
 }
 
@@ -13,7 +13,7 @@ func (w *LimitWriter) Write(buf []byte) (int, error) {
 	if w.UnLimit() {
 		return w.writer.Write(buf)
 	}
-	
+
 	// Calculate the data size that can be written within 10ms and
 	// round it up to the next KB to avoid too many small writes
 	singleWriteSize := int(w.Limit() / 100)                 // 10ms worth of data
@@ -21,7 +21,7 @@ func (w *LimitWriter) Write(buf []byte) (int, error) {
 	if singleWriteSize > limiterBurstSize {
 		singleWriteSize = limiterBurstSize
 	}
-	
+
 	written := 0
 	for written < len(buf) {
 		toWrite := singleWriteSize
@@ -35,6 +35,10 @@ func (w *LimitWriter) Write(buf []byte) (int, error) {
 			return written, err
 		}
 	}
-	
+
 	return written, nil
+}
+
+func (w *LimitWriter) Close() error {
+	return w.writer.Close()
 }

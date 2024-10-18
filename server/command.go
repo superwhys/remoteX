@@ -50,7 +50,7 @@ func (s *RemoteXServer) handleCommand(ctx context.Context, stream connection.Str
 
 	plog.Debugf("received command: %v", cmd)
 
-	resp, err := s.commandService.DoCommand(ctx, cmd)
+	resp, err := s.commandService.DoCommand(ctx, cmd, stream)
 	if err != nil {
 		if resp == nil {
 			resp = &command.Ret{}

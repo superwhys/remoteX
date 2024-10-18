@@ -10,6 +10,8 @@ enum CommandType {
   // EMPTY is the type of command sent during connection establishment
   EMPTY = 0;
   ListDir = 1;
+  Push = 2;
+  Pull = 3; 
 }
 
 message Command {
