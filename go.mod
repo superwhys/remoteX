@@ -4,7 +4,7 @@ go 1.23.2
 
 require (
 	github.com/gin-gonic/gin v1.10.0
-	github.com/go-puzzles/pgin v1.0.5
+	github.com/go-puzzles/pgin v1.0.6
 	github.com/go-puzzles/puzzles v1.0.14
 	github.com/gogo/protobuf v1.3.2
 	github.com/pkg/errors v0.9.1

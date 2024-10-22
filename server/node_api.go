@@ -24,7 +24,7 @@ func (s *RemoteXServer) getAllNodes() gin.HandlerFunc {
 }
 
 type getNode struct {
-	NodeId string `uri:"nodeId"`
+	NodeId string `uri:"nodeId" binding:"required"`
 }
 
 func (s *RemoteXServer) getNode(c *gin.Context, req *getNode) {
@@ -39,7 +39,7 @@ func (s *RemoteXServer) getNode(c *gin.Context, req *getNode) {
 }
 
 type listDirReq struct {
-	Path string `form:"path"`
+	Path string `form:"path" binding:"required"`
 }
 
 func (s *RemoteXServer) listDir(c *gin.Context, req *listDirReq) {
@@ -54,18 +54,30 @@ func (s *RemoteXServer) listDir(c *gin.Context, req *listDirReq) {
 }
 
 type listRemoteDir struct {
-	NodeId string `uri:"nodeId"`
-	Path   string `form:"path"`
+	NodeId string `uri:"nodeId" binding:"required"`
+	Path   string `form:"path" binding:"required"`
 }
 
 func (s *RemoteXServer) listRemoteDir(c *gin.Context, req *listRemoteDir) {
-	if req.NodeId == "" {
-		pgin.ReturnError(c, http.StatusBadRequest, "remote nodeId is required")
-		return
-	}
 	cmd := &command.Command{Type: command.Listdir, Args: map[string]string{"path": req.Path}}
 
 	resp, err := s.handleRemoteCommand(c, common.NodeID(req.NodeId), cmd)
+	if err != nil {
+		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("handle remote command error: %v", err))
+		return
+	}
+
+	pgin.ReturnSuccess(c, resp)
+}
+
+type pullEntry struct {
+	Target string `json:"target" binding:"required"`
+	Path   string `json:"path" binding:"required"`
+}
+
+func (s *RemoteXServer) pullEntry(c *gin.Context, req *pullEntry) {
+	cmd := &command.Command{Type: command.Pull, Args: map[string]string{"path": req.Path}}
+	resp, err := s.handleRemoteCommand(c, common.NodeID(req.Target), cmd)
 	if err != nil {
 		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("handle remote command error: %v", err))
 		return

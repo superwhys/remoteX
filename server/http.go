@@ -6,15 +6,17 @@ import (
 )
 
 func (s *RemoteXServer) SetupHttpServer() *gin.Engine {
-	engine := pgin.Default()
+	router := pgin.Default()
 
-	nodeRouter := engine.Group("node")
+	router.GET("", s.getAllNodes())
+	router.GET("/list/dir", pgin.RequestHandler(s.listDir))
+	router.POST("/pull", pgin.RequestHandler(s.pullEntry))
+
+	nodeRouter := router.Group("/node/:nodeId")
 	{
-		nodeRouter.GET("", s.getAllNodes())
-		nodeRouter.GET("/:nodeId", pgin.RequestHandler(s.getNode))
-		nodeRouter.GET("/list/dir", pgin.RequestHandler(s.listDir))
-		nodeRouter.GET("/:nodeId/list/dir", pgin.RequestHandler(s.listRemoteDir))
+		nodeRouter.GET("", pgin.RequestHandler(s.getNode))
+		nodeRouter.GET("/list/dir", pgin.RequestHandler(s.listRemoteDir))
 	}
 
-	return engine
+	return router
 }
