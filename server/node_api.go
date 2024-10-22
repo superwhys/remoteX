@@ -1,13 +1,15 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-puzzles/pgin"
-	"github.com/go-puzzles/puzzles/plog"
+	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
+	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/pkg/common"
 )
 
@@ -28,7 +30,6 @@ type getNode struct {
 }
 
 func (s *RemoteXServer) getNode(c *gin.Context, req *getNode) {
-	plog.Infof("get node request: %v", req)
 	node, err := s.nodeService.GetNode(common.NodeID(req.NodeId))
 	if err != nil {
 		pgin.ReturnError(c, http.StatusNotFound, err.Error())
@@ -61,7 +62,7 @@ type listRemoteDir struct {
 func (s *RemoteXServer) listRemoteDir(c *gin.Context, req *listRemoteDir) {
 	cmd := &command.Command{Type: command.Listdir, Args: map[string]string{"path": req.Path}}
 
-	resp, err := s.handleRemoteCommand(c, common.NodeID(req.NodeId), cmd)
+	resp, err := s.handleRemoteCommand(c, common.NodeID(req.NodeId), cmd, nil)
 	if err != nil {
 		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("handle remote command error: %v", err))
 		return
@@ -72,12 +73,18 @@ func (s *RemoteXServer) listRemoteDir(c *gin.Context, req *listRemoteDir) {
 
 type pullEntry struct {
 	Target string `json:"target" binding:"required"`
-	Path   string `json:"path" binding:"required"`
+	Src    string `json:"src" binding:"required"`
+	Dest   string `json:"dest" binding:"required"`
 }
 
 func (s *RemoteXServer) pullEntry(c *gin.Context, req *pullEntry) {
-	cmd := &command.Command{Type: command.Pull, Args: map[string]string{"path": req.Path}}
-	resp, err := s.handleRemoteCommand(c, common.NodeID(req.Target), cmd)
+	remoteCmd := &command.Command{Type: command.Push, Args: map[string]string{"path": req.Src}}
+
+	resp, err := s.handleRemoteCommand(c, common.NodeID(req.Target), remoteCmd, func(ctx context.Context, stream connection.Stream) error {
+		localCmd := &command.Command{Type: command.Pull, Args: map[string]string{"dest": req.Dest}}
+		_, err := s.commandService.DoCommand(ctx, localCmd, stream)
+		return errors.Wrapf(err, "localCmd pull(%s -> %s)", req.Src, req.Dest)
+	})
 	if err != nil {
 		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("handle remote command error: %v", err))
 		return

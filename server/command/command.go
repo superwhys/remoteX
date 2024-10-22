@@ -30,8 +30,8 @@ func NewCommandService() command.Service {
 
 	s.registerStrategy(command.Empty, s.doEmpty)
 	s.registerStrategy(command.Listdir, fsSrv.ListDir)
-	s.registerStrategy(command.Push, syncSrv.Pull)
-	s.registerStrategy(command.Pull, syncSrv.Push)
+	s.registerStrategy(command.Push, syncSrv.Push)
+	s.registerStrategy(command.Pull, syncSrv.Pull)
 
 	return s
 }

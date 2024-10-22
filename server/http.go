@@ -8,9 +8,9 @@ import (
 func (s *RemoteXServer) SetupHttpServer() *gin.Engine {
 	router := pgin.Default()
 
-	router.GET("", s.getAllNodes())
+	router.GET("/node", s.getAllNodes())
 	router.GET("/list/dir", pgin.RequestHandler(s.listDir))
-	router.POST("/pull", pgin.RequestHandler(s.pullEntry))
+	router.POST("/sync/pull", pgin.RequestHandler(s.pullEntry))
 
 	nodeRouter := router.Group("/node/:nodeId")
 	{

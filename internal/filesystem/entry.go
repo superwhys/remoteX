@@ -6,13 +6,13 @@ import (
 )
 
 func init() {
-	protoutils.RegisterDecoderFunc("type.googleapis.com/entry.ListResp", func(b []byte) (proto.Message, error) {
+	protoutils.RegisterDecoderFunc("type.googleapis.com/filesystem.ListResp", func(b []byte) (proto.Message, error) {
 		resp := new(ListResp)
 		err := proto.Unmarshal(b, resp)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		return resp, nil
 	})
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/pkg/common"
+	"golang.org/x/sync/errgroup"
 )
 
 func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.TlsConn) error {
@@ -68,7 +69,9 @@ func (s *RemoteXServer) handleCommand(ctx context.Context, stream connection.Str
 	return nil
 }
 
-func (s *RemoteXServer) handleRemoteCommand(ctx context.Context, nodeId common.NodeID, cmd *command.Command) (resp *command.Ret, err error) {
+type callbackFn func(ctx context.Context, stream connection.Stream) error
+
+func (s *RemoteXServer) handleRemoteCommand(ctx context.Context, nodeId common.NodeID, cmd *command.Command, callback callbackFn) (resp *command.Ret, err error) {
 	remoteNode, err := s.nodeService.GetNode(nodeId)
 	if err != nil {
 		return nil, errors.Wrap(err, "getNode")
@@ -87,9 +90,25 @@ func (s *RemoteXServer) handleRemoteCommand(ctx context.Context, nodeId common.N
 	}
 	defer stream.Close()
 
-	if err = stream.WriteMessage(cmd); err != nil {
-		return nil, errors.Wrap(err, "writeCommandMessage")
+	eg, ctx := errgroup.WithContext(ctx)
+
+	if callback != nil {
+		eg.Go(func() error {
+			return callback(ctx, stream)
+		})
 	}
+
+	eg.Go(func() error {
+		return stream.WriteMessage(cmd)
+	})
+
+	if err := eg.Wait(); err != nil {
+		return nil, errors.Wrap(err, "do remote command")
+	}
+
+	// if err = stream.WriteMessage(cmd); err != nil {
+	// 	return nil, errors.Wrap(err, "writeCommandMessage")
+	// }
 
 	resp = new(command.Ret)
 	if err = stream.ReadMessage(resp); err != nil {
