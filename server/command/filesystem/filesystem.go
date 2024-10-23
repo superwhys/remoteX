@@ -28,7 +28,7 @@ func (s *ServiceImpl) ListDir(_ context.Context, args command.Args, _ protoutils
 		return nil, errorutils.ErrCommandMissingArguments(int32(command.Listdir), args)
 	}
 
-	entries, err := s.fs.List(path)
+	entries, err := s.fs.List(path.GetStrValue())
 	if err != nil {
 		return nil, err
 	}

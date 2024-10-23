@@ -5,6 +5,17 @@ package pb;
 import "ext.proto";
 import "internal/filesystem/entry.proto";
 
+message SyncOpts {
+	// Path is the destination file or directory sent by the sender
+	string path = 1;
+	// Dest is the local directory where the receiver will save the file or directory received by the sender
+	string dest = 2;
+	// DryRun simulated operation without actual file transfer
+	bool dry_run = 3;
+	// Whole sync all files, not just modified ones. Default is false, sync only modified files.
+	bool whole = 4;
+}
+
 message FileBase {
 	filesystem.Entry entry = 1 [(ext.nullable) = true];
   	bool is_end = 2;

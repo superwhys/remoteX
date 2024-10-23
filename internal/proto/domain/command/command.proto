@@ -7,16 +7,23 @@ import "google/protobuf/any.proto";
 
 
 enum CommandType {
-  // EMPTY is the type of command sent during connection establishment
-  EMPTY = 0;
-  ListDir = 1;
-  Push = 2;
-  Pull = 3; 
+	// EMPTY is the type of command sent during connection establishment
+  	EMPTY = 0;
+  	ListDir = 1;
+  	Push = 2;
+  	Pull = 3; 
 }
 
 message Command {
-  CommandType type = 1;
-  map<string, string> args = 2;
+	message Arg {
+		oneof value {
+			string str_value = 1;
+  	  	  	int64 int_value = 2;
+  	  	  	bool bool_value = 3;
+  	  	}
+  	}
+  	CommandType type = 1;
+  	map<string, Arg> args = 2;
 }
 
 message MapResp {
@@ -24,8 +31,7 @@ message MapResp {
 }
 
 message Ret {
-  Command command = 1 [(ext.nullable) = true];
-  google.protobuf.Any resp = 2 [(ext.nullable) = true];
-  uint64 err_no = 3;
-  string err_msg = 4;
+	google.protobuf.Any resp = 1 [(ext.nullable) = true];
+  	uint64 err_no = 2;
+  	string err_msg = 3;
 }

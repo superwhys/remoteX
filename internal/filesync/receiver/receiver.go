@@ -11,17 +11,37 @@ import (
 	"github.com/superwhys/remoteX/internal/filesync/common"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
 	"github.com/superwhys/remoteX/internal/filesync/match"
-	"github.com/superwhys/remoteX/internal/filesync/opts"
 	"github.com/superwhys/remoteX/internal/filesync/pb"
 	"github.com/superwhys/remoteX/internal/filesystem"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
 type ReceiveTransfer struct {
-	Opts      *opts.SyncOpt
+	Opts      *pb.SyncOpts
 	Dest      string
 	DestIsDir bool
 	Rw        protoutils.ProtoMessageReadWriter
+}
+
+func (rt *ReceiveTransfer) receiveOpts() (*pb.SyncOpts, error) {
+	opts := new(pb.SyncOpts)
+	if err := rt.Rw.ReadMessage(opts); err != nil {
+		return nil, err
+	}
+
+	return opts, nil
+}
+
+func (rt *ReceiveTransfer) MergeRemoteOpts() error {
+	opts, err := rt.receiveOpts()
+	if err != nil {
+		return errors.Wrap(err, "receiveRemoteOpts")
+	}
+
+	rt.Opts.DryRun = opts.DryRun
+	rt.Opts.Whole = opts.Whole
+
+	return nil
 }
 
 func (rt *ReceiveTransfer) ReceiveFileList(ctx context.Context) (*pb.FileList, error) {
@@ -69,7 +89,8 @@ func (rt *ReceiveTransfer) checkdir(dir string) error {
 }
 
 func (rt *ReceiveTransfer) CalcFileHashAndSend(ctx context.Context, local string) error {
-	if !putils.FileExists(local) {
+	// whole file
+	if rt.Opts.Whole || !putils.FileExists(local) {
 		return rt.Rw.WriteMessage(&pb.HashHead{
 			BlockLength: int64(common.BlockSize),
 		})

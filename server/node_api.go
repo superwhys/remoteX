@@ -43,8 +43,17 @@ type listDirReq struct {
 	Path string `form:"path" binding:"required"`
 }
 
+func (l *listDirReq) toCommand(t command.CommandType) *command.Command {
+	return &command.Command{
+		Type: t,
+		Args: map[string]command.Command_Arg{
+			"path": command.StrArg(l.Path),
+		},
+	}
+}
+
 func (s *RemoteXServer) listDir(c *gin.Context, req *listDirReq) {
-	cmd := &command.Command{Type: command.Listdir, Args: map[string]string{"path": req.Path}}
+	cmd := req.toCommand(command.Listdir)
 	ret, err := s.commandService.DoCommand(c, cmd, nil)
 	if err != nil {
 		pgin.ReturnError(c, http.StatusInternalServerError, err.Error())
@@ -59,9 +68,17 @@ type listRemoteDir struct {
 	Path   string `form:"path" binding:"required"`
 }
 
-func (s *RemoteXServer) listRemoteDir(c *gin.Context, req *listRemoteDir) {
-	cmd := &command.Command{Type: command.Listdir, Args: map[string]string{"path": req.Path}}
+func (l *listRemoteDir) toCommand(t command.CommandType) *command.Command {
+	return &command.Command{
+		Type: t,
+		Args: map[string]command.Command_Arg{
+			"path": command.StrArg(l.Path),
+		},
+	}
+}
 
+func (s *RemoteXServer) listRemoteDir(c *gin.Context, req *listRemoteDir) {
+	cmd := req.toCommand(command.Listdir)
 	resp, err := s.handleRemoteCommand(c, common.NodeID(req.NodeId), cmd, nil)
 	if err != nil {
 		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("handle remote command error: %v", err))
@@ -75,17 +92,30 @@ type pullEntry struct {
 	Target string `json:"target" binding:"required"`
 	Src    string `json:"src" binding:"required"`
 	Dest   string `json:"dest" binding:"required"`
+	DryRun bool   `json:"dry_run"`
+	Whole  bool   `json:"whole"`
+}
+
+func (p *pullEntry) toCommand(t command.CommandType) *command.Command {
+	return &command.Command{
+		Type: t,
+		Args: map[string]command.Command_Arg{
+			"path":    command.StrArg(p.Src),
+			"dest":    command.StrArg(p.Dest),
+			"dry_run": command.BoolArg(p.DryRun),
+			"whole":   command.BoolArg(p.Whole),
+		},
+	}
 }
 
 func (s *RemoteXServer) pullEntry(c *gin.Context, req *pullEntry) {
-	remoteCmd := &command.Command{Type: command.Push, Args: map[string]string{"path": req.Src}}
-
 	callback := func(ctx context.Context, stream connection.Stream) error {
-		localCmd := &command.Command{Type: command.Pull, Args: map[string]string{"dest": req.Dest}}
+		localCmd := req.toCommand(command.Pull)
 		_, err := s.commandService.DoCommand(ctx, localCmd, stream)
 		return errors.Wrapf(err, "localCmd pull(%s -> %s)", req.Src, req.Dest)
 	}
 
+	remoteCmd := req.toCommand(command.Push)
 	resp, err := s.handleRemoteCommand(c, common.NodeID(req.Target), remoteCmd, callback)
 	if err != nil {
 		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("handle remote command error: %v", err))

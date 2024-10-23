@@ -50,14 +50,14 @@ func (s *ServiceImpl) handleCommand(ctx context.Context, cmdType command.Command
 }
 
 func (s *ServiceImpl) DoCommand(ctx context.Context, cmd *command.Command, stream connection.Stream) (ret *command.Ret, err error) {
-	pm, err := s.handleCommand(ctx, cmd.GetType(), cmd.GetArgs(), stream)
+	pm, err := s.handleCommand(ctx, cmd.Type, cmd.Args, stream)
 	if err != nil {
 		return nil, err
 	}
 
 	var anyData *types.Any
 	if pm == nil {
-		return &command.Ret{Command: cmd}, nil
+		return &command.Ret{}, nil
 	}
 
 	anyData, err = types.MarshalAny(pm)
@@ -65,7 +65,7 @@ func (s *ServiceImpl) DoCommand(ctx context.Context, cmd *command.Command, strea
 		return nil, err
 	}
 
-	return &command.Ret{Command: cmd, Resp: anyData}, nil
+	return &command.Ret{Resp: anyData}, nil
 }
 
 func (s *ServiceImpl) doEmpty(_ context.Context, _ command.Args, _ protoutils.ProtoMessageReadWriter) (proto.Message, error) {

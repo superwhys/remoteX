@@ -6,23 +6,41 @@ import (
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
+func StrArg(val string) Command_Arg {
+	return Command_Arg{
+		Value: &Command_Arg_StrValue{StrValue: val},
+	}
+}
+
+func BoolArg(val bool) Command_Arg {
+	return Command_Arg{
+		Value: &Command_Arg_BoolValue{BoolValue: val},
+	}
+}
+
+func IntArg(val int64) Command_Arg {
+	return Command_Arg{
+		Value: &Command_Arg_IntValue{IntValue: val},
+	}
+}
+
 func EmptyCommand() *Command {
 	return &Command{
 		Type: Empty,
-		Args: map[string]string{"type": "empty"},
+		Args: map[string]Command_Arg{
+			"type": {Value: &Command_Arg_StrValue{StrValue: "empty"}},
+		},
 	}
 }
 
 func (m *Ret) MarshalJSON() ([]byte, error) {
 	respValue := struct {
-		Command *Command `json:"command,omitempty"`
-		Resp    any      `json:"resp,omitempty"`
-		ErrNo   uint64   `json:"errNo,omitempty"`
-		ErrMsg  string   `json:"errMsg,omitempty"`
+		Resp   any    `json:"resp,omitempty"`
+		ErrNo  uint64 `json:"errNo,omitempty"`
+		ErrMsg string `json:"errMsg,omitempty"`
 	}{
-		Command: m.Command,
-		ErrNo:   m.ErrNo,
-		ErrMsg:  m.ErrMsg,
+		ErrNo:  m.ErrNo,
+		ErrMsg: m.ErrMsg,
 	}
 
 	if m.Resp != nil {

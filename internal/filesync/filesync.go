@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
-	"github.com/superwhys/remoteX/internal/filesync/opts"
 	"github.com/superwhys/remoteX/internal/filesync/pb"
 	"github.com/superwhys/remoteX/internal/filesync/receiver"
 	"github.com/superwhys/remoteX/internal/filesync/sender"
@@ -15,12 +14,16 @@ import (
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
-func SendFiles(ctx context.Context, rw protoutils.ProtoMessageReadWriter, path string, opts *opts.SyncOpt) (resp *pb.SyncResp, err error) {
+func SendFiles(ctx context.Context, rw protoutils.ProtoMessageReadWriter, path string, opts *pb.SyncOpts) (resp *pb.SyncResp, err error) {
 	opts = opts.SetDefault()
 
 	st := &sender.SendTransfer{
 		Opts: opts,
 		Rw:   rw,
+	}
+
+	if err := st.SendOpts(opts); err != nil {
+		return nil, errors.Wrap(err, "sendOpts")
 	}
 
 	fileList, err := st.SendFileList(ctx, path)
@@ -46,6 +49,7 @@ func SendFiles(ctx context.Context, rw protoutils.ProtoMessageReadWriter, path s
 		plog.Debugf("receive file idx %d, file: %s", fileIdx.GetIdx(), file.GetEntry().GetWpath())
 
 		if opts.DryRun {
+			resp = st.Statistic(resp, file)
 			continue
 		}
 
@@ -72,22 +76,14 @@ func SendFiles(ctx context.Context, rw protoutils.ProtoMessageReadWriter, path s
 		}
 
 		// statistic
-		transFile := &pb.SyncFile{
-			Name: file.GetEntry().GetName(),
-			Size: file.GetEntry().GetSize(),
-			Type: file.GetEntry().GetType(),
-		}
-		resp.Total++
-		resp.TotalSize += file.GetEntry().GetSize()
-		resp.ActualSendBytes = int64(st.ActualSend)
-		resp.Files = append(resp.Files, transFile)
-		plog.Debugf("transfer file success: %v", transFile)
+		resp = st.Statistic(resp, file)
+		plog.Debugf("transfer file success: %v", srcPath)
 	}
 
 	return resp, nil
 }
 
-func ReceiveFile(ctx context.Context, rw protoutils.ProtoMessageReadWriter, dest string, opts *opts.SyncOpt) error {
+func ReceiveFile(ctx context.Context, rw protoutils.ProtoMessageReadWriter, dest string, opts *pb.SyncOpts) error {
 	opts = opts.SetDefault()
 
 	rt := &receiver.ReceiveTransfer{
@@ -95,6 +91,13 @@ func ReceiveFile(ctx context.Context, rw protoutils.ProtoMessageReadWriter, dest
 		Dest: dest,
 		Rw:   rw,
 	}
+
+	err := rt.MergeRemoteOpts()
+	if err != nil {
+		return errors.Wrap(err, "mergeRemoteOpts")
+	}
+	opts = rt.Opts
+
 	// receive fileList
 	fileList, err := rt.ReceiveFileList(ctx)
 	if err != nil {

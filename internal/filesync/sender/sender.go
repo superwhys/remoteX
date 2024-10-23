@@ -10,16 +10,19 @@ import (
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/internal/filesync/match"
-	"github.com/superwhys/remoteX/internal/filesync/opts"
 	"github.com/superwhys/remoteX/internal/filesync/pb"
 	"github.com/superwhys/remoteX/internal/filesystem"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
 type SendTransfer struct {
-	Opts       *opts.SyncOpt
+	Opts       *pb.SyncOpts
 	Rw         protoutils.ProtoMessageReadWriter
 	ActualSend int
+}
+
+func (st *SendTransfer) SendOpts(opts *pb.SyncOpts) error {
+	return st.Rw.WriteMessage(opts)
 }
 
 func (st *SendTransfer) SendFileList(ctx context.Context, root string) (*pb.FileList, error) {
@@ -192,4 +195,18 @@ func (st *SendTransfer) GetFileList(root string) iter.Seq[*pb.FileBase] {
 			yield(f)
 		}
 	}
+}
+
+func (st *SendTransfer) Statistic(r *pb.SyncResp, file *pb.FileBase) *pb.SyncResp {
+	transFile := &pb.SyncFile{
+		Name: file.GetEntry().GetName(),
+		Size: file.GetEntry().GetSize(),
+		Type: file.GetEntry().GetType(),
+	}
+	r.Total++
+	r.TotalSize += file.GetEntry().GetSize()
+	r.ActualSendBytes = int64(st.ActualSend)
+	r.Files = append(r.Files, transFile)
+
+	return r
 }
