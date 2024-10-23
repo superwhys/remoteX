@@ -16,13 +16,14 @@ message Entry {
   EntryType type = 2 [(ext.json) = "type,omitempty"]; 
   int64 size = 3 [(ext.json) = "size,omitempty"];
   string path = 4 [(ext.json) = "path,omitempty"];
-  string created_time = 5 [(ext.json) = "created_time,omitempty"];
-  string modified_time = 6 [(ext.json) = "modified_time,omitempty"];
-  string accessed_time = 7 [(ext.json) = "accessed_time,omitempty"];
-  string owner = 8 [(ext.json) = "owner,omitempty"];
-  string permissions = 9 [(ext.json) = "permissions,omitempty"];
-  bool regular = 10;
-  repeated Entry children = 11 [(ext.json) = "children,omitempty", (ext.nullable) = true];
+  string wpath = 5 [(ext.json) = "wpath,omitempty"];
+  string created_time = 6 [(ext.json) = "created_time,omitempty"];
+  string modified_time = 7 [(ext.json) = "modified_time,omitempty"];
+  string accessed_time = 8 [(ext.json) = "accessed_time,omitempty"];
+  string owner = 9 [(ext.json) = "owner,omitempty"];
+  string permissions = 10 [(ext.json) = "permissions,omitempty"];
+  bool regular = 11;
+  repeated Entry children = 12 [(ext.json) = "children,omitempty", (ext.nullable) = true];
 }
 
 message ListResp {

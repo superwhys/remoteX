@@ -7,7 +7,7 @@ import (
 	"iter"
 	"os"
 	"path/filepath"
-	
+
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/internal/filesync/pb"
@@ -19,7 +19,7 @@ func SyncFileToWriter(ctx context.Context, matchIter iter.Seq2[*pb.FileChunk, er
 		if err != nil {
 			return errors.Wrap(err, "iter file match")
 		}
-		
+
 		var data []byte
 		if matchChunk.GetHash() != nil {
 			offset := matchChunk.Hash.GetOffset()
@@ -30,19 +30,19 @@ func SyncFileToWriter(ctx context.Context, matchIter iter.Seq2[*pb.FileChunk, er
 		} else {
 			data = matchChunk.GetData()
 		}
-		
+
 		_, err := writer.Write(data)
 		if err != nil {
 			return errors.Wrap(err, "write to Writer")
 		}
-		
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 	}
-	
+
 	return nil
 }
 
@@ -50,8 +50,7 @@ func SyncFile(ctx context.Context, matchIter iter.Seq2[*pb.FileChunk, error], ta
 	path := target.Name()
 	baseName := filepath.Base(path)
 	tmpPath := filepath.Join(filepath.Dir(path), fmt.Sprintf("tmp-%s", baseName))
-	
-	tmpFile, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
+	tmpFile, err := filesystem.BasicFs.CreateFile(tmpPath)
 	if err != nil {
 		return errors.Wrap(err, "create tmp file")
 	}
@@ -63,12 +62,12 @@ func SyncFile(ctx context.Context, matchIter iter.Seq2[*pb.FileChunk, error], ta
 		}
 		tmpFile.Close()
 		target.Close()
-		
+
 		if err := os.Rename(tmpPath, path); err != nil {
 			plog.Errorf("rename tmp file to target file: %v", err)
 			return
 		}
-		
+
 		f, err := filesystem.BasicFs.OpenFile(path)
 		if err != nil {
 			plog.Errorf("open target file after rename: %v", err)
@@ -76,11 +75,11 @@ func SyncFile(ctx context.Context, matchIter iter.Seq2[*pb.FileChunk, error], ta
 		}
 		target.Update(f)
 	}()
-	
+
 	err = SyncFileToWriter(ctx, matchIter, target, tmpFile)
 	if err != nil {
 		return errors.Wrap(err, "sync file to Writer")
 	}
-	
+
 	return nil
 }

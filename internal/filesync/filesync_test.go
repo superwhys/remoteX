@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	
+
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/go-puzzles/puzzles/plog/level"
 	"github.com/stretchr/testify/assert"
@@ -37,32 +37,32 @@ func tempFileCreate(size int) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	content := make([]byte, size)
 	for i := 0; i < size; i++ {
 		content[i] = byte(i % 256)
 	}
-	
+
 	_, err = tmpFile.Write(content)
 	if err != nil {
 		return "", err
 	}
-	
+
 	if err := tmpFile.Close(); err != nil {
 		return "", err
 	}
-	
+
 	return tmpFile.Name(), nil
 }
 
 func TestTransferWholeFile(t *testing.T) {
 	plog.Enable(level.LevelDebug)
-	
+
 	reader, writer := io.Pipe()
 	rd := protoutils.NewProtoReader(reader)
 	wr := protoutils.NewProtoWriter(writer)
 	rw := &readWriter{rd, wr}
-	
+
 	tmpFile, err := tempFileCreate(1024 * 1024 * 100)
 	if err != nil {
 		t.Fatal(err)
@@ -73,23 +73,24 @@ func TestTransferWholeFile(t *testing.T) {
 		os.Remove(tmpFile)
 		os.Remove(targetFile)
 	}()
-	
+
 	fmt.Println(tmpFile, targetFile)
-	
+
 	grp, ctx := errgroup.WithContext(context.Background())
 	grp.Go(func() error {
 		defer rw.Close()
-		return filesync.SendFiles(ctx, rw, tmpFile, nil)
+		_, err := filesync.SendFiles(ctx, rw, tmpFile, nil)
+		return err
 	})
 	grp.Go(func() error {
 		defer rw.Close()
 		return filesync.ReceiveFile(ctx, rw, targetFile, nil)
 	})
-	
+
 	if err := grp.Wait(); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	tempF, err := filesystem.BasicFs.OpenFile(tmpFile)
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +99,7 @@ func TestTransferWholeFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	tempM, err := tempF.MD5()
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +108,32 @@ func TestTransferWholeFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	assert.Equal(t, tempM, targetM)
+}
+
+func TestTransferDir(t *testing.T) {
+	plog.Enable(level.LevelDebug)
+
+	reader, writer := io.Pipe()
+	rd := protoutils.NewProtoReader(reader)
+	wr := protoutils.NewProtoWriter(writer)
+	rw := &readWriter{rd, wr}
+
+	source := "/Users/yong/programes/go/src/github.com/superwhys/remoteX/content"
+	target := "/tmp/remoteX/content"
+	grp, ctx := errgroup.WithContext(context.Background())
+	grp.Go(func() error {
+		defer rw.Close()
+		_, err := filesync.SendFiles(ctx, rw, source, nil)
+		return err
+	})
+	grp.Go(func() error {
+		defer rw.Close()
+		return filesync.ReceiveFile(ctx, rw, target, nil)
+	})
+
+	if err := grp.Wait(); err != nil {
+		t.Fatal(err)
+	}
 }

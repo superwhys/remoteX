@@ -2,7 +2,7 @@ package protoutils
 
 import (
 	"errors"
-	
+
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 )
@@ -22,6 +22,6 @@ func DecodeAnyProto(anyProto *types.Any) (proto.Message, error) {
 	if !exists {
 		return nil, errors.New("unknown any.proto decoder")
 	}
-	
+
 	return decoder(anyProto.Value)
 }

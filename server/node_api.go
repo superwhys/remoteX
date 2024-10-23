@@ -80,11 +80,13 @@ type pullEntry struct {
 func (s *RemoteXServer) pullEntry(c *gin.Context, req *pullEntry) {
 	remoteCmd := &command.Command{Type: command.Push, Args: map[string]string{"path": req.Src}}
 
-	resp, err := s.handleRemoteCommand(c, common.NodeID(req.Target), remoteCmd, func(ctx context.Context, stream connection.Stream) error {
+	callback := func(ctx context.Context, stream connection.Stream) error {
 		localCmd := &command.Command{Type: command.Pull, Args: map[string]string{"dest": req.Dest}}
 		_, err := s.commandService.DoCommand(ctx, localCmd, stream)
 		return errors.Wrapf(err, "localCmd pull(%s -> %s)", req.Src, req.Dest)
-	})
+	}
+
+	resp, err := s.handleRemoteCommand(c, common.NodeID(req.Target), remoteCmd, callback)
 	if err != nil {
 		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("handle remote command error: %v", err))
 		return

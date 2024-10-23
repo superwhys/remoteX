@@ -5,6 +5,7 @@ import (
 	"iter"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -33,7 +34,7 @@ func NewBasicFileSystem() *BasicFileSystem {
 	once.Do(func() {
 		BasicFs = &BasicFileSystem{}
 	})
-	
+
 	return BasicFs
 }
 
@@ -41,22 +42,22 @@ func (f *BasicFileSystem) List(path string) (entries []*Entry, err error) {
 	if !filepath.IsAbs(path) {
 		return nil, ErrDirPahtNotAbs
 	}
-	
+
 	if !PathExists(path) {
 		return nil, ErrDirPathNotFound
 	}
-	
+
 	dirEntries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, de := range dirEntries {
 		info, err := de.Info()
 		if err != nil {
 			return nil, err
 		}
-		
+
 		entry := &Entry{
 			Name:         de.Name(),
 			Path:         filepath.Join(path, de.Name()),
@@ -72,7 +73,7 @@ func (f *BasicFileSystem) List(path string) (entries []*Entry, err error) {
 		entry.Owner, entry.Permissions, _ = getFileInfo(path)
 		entries = append(entries, entry)
 	}
-	
+
 	return
 }
 
@@ -80,52 +81,58 @@ func (f *BasicFileSystem) Walk(path string, filter WalkFilter) (entries []*Entry
 	if !filepath.IsAbs(path) {
 		return nil, ErrDirPahtNotAbs
 	}
-	
+
 	if !PathExists(path) {
 		return nil, ErrDirPathNotFound
 	}
-	
+
 	return
 }
 
-func (f *BasicFileSystem) WalkIter(path string, filter WalkFilter) (iter.Seq[*Entry], error) {
-	if !filepath.IsAbs(path) {
+func (f *BasicFileSystem) WalkIter(root string, filter WalkFilter) (iter.Seq[*Entry], error) {
+	if !filepath.IsAbs(root) {
 		return nil, ErrDirPahtNotAbs
 	}
-	
-	if !PathExists(path) {
+
+	if !PathExists(root) {
 		return nil, ErrDirPathNotFound
 	}
-	
+
 	ch := make(chan *Entry)
 	go func() {
-		filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
+		strip := filepath.Dir(filepath.Clean(root)) + "/"
+		if strings.HasSuffix(root, "/") {
+			strip = filepath.Clean(root) + "/"
+		}
+
+		filepath.Walk(root, func(path string, info fs.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			
+
 			if filter != nil && !filter(path, info) {
 				return nil
 			}
-			
+
 			entry := &Entry{
 				Name:         info.Name(),
 				Type:         GetEntryType(info.IsDir()),
 				Size:         info.Size(),
 				Path:         path,
+				Wpath:        strings.TrimPrefix(path, strip),
 				CreatedTime:  info.ModTime().Format(time.DateTime),
 				ModifiedTime: info.ModTime().Format(time.DateTime),
 				AccessedTime: info.ModTime().Format(time.DateTime),
 				Regular:      info.Mode().IsRegular(),
 			}
-			
+
 			entry.Owner, entry.Permissions, _ = getFileInfo(path)
 			ch <- entry
 			return nil
 		})
 		close(ch)
 	}()
-	
+
 	return func(yield func(*Entry) bool) {
 		for e := range ch {
 			if !yield(e) {
@@ -140,7 +147,7 @@ func (f *BasicFileSystem) OpenFile(path string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &File{
 		file: file,
 	}, nil
@@ -151,7 +158,7 @@ func (f *BasicFileSystem) CreateFile(path string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &File{
 		file: file,
 	}, nil
@@ -159,16 +166,16 @@ func (f *BasicFileSystem) CreateFile(path string) (*File, error) {
 
 func (f *BasicFileSystem) ReadFileAtOffset(file *File, offset int64, length int64) ([]byte, error) {
 	buffer := make([]byte, length)
-	
+
 	_, err := file.Seek(offset, 0)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	n, err := file.Read(buffer)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return buffer[:n], nil
 }

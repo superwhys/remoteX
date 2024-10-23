@@ -33,11 +33,12 @@ func (s *ServiceImpl) Push(ctx context.Context, args command.Args, rw protoutils
 	if path == "" {
 		return nil, errorutils.ErrCommandMissingArguments(int32(command.Push), args)
 	}
-	if err := filesync.SendFiles(ctx, rw, path, nil); err != nil {
+	resp, err := filesync.SendFiles(ctx, rw, path, nil)
+	if err != nil {
 		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
 	}
 
-	return nil, nil
+	return resp, nil
 }
 
 func (s *ServiceImpl) Pull(ctx context.Context, args command.Args, rw protoutils.ProtoMessageReadWriter) (proto.Message, error) {

@@ -106,10 +106,6 @@ func (s *RemoteXServer) handleRemoteCommand(ctx context.Context, nodeId common.N
 		return nil, errors.Wrap(err, "do remote command")
 	}
 
-	// if err = stream.WriteMessage(cmd); err != nil {
-	// 	return nil, errors.Wrap(err, "writeCommandMessage")
-	// }
-
 	resp = new(command.Ret)
 	if err = stream.ReadMessage(resp); err != nil {
 		return nil, errors.Wrap(err, "readRespMessage")

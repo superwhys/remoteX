@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 	"unicode"
-	
+
 	"github.com/superwhys/remoteX/internal/proto/ext"
-	
+
 	"github.com/gogo/protobuf/gogoproto"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
@@ -19,7 +19,7 @@ func main() {
 	req := command.Read()
 	files := req.GetProtoFile()
 	files = vanity.FilterFiles(files, vanity.NotGoogleProtobufDescriptorProto)
-	
+
 	vanity.ForEachFile(files, TurnOnProtoSizerAll)
 	vanity.ForEachFile(files, vanity.TurnOffGoEnumPrefixAll)
 	vanity.ForEachFile(files, vanity.TurnOffGoUnrecognizedAll)
@@ -31,7 +31,7 @@ func main() {
 	vanity.ForEachFile(files, SetPackagePrefix("github.com/superwhys/remoteX"))
 	vanity.ForEachFile(files, HandleFile)
 	vanity.ForEachFieldInFilesExcludingExtensions(files, TurnOffNullableForMessages)
-	
+
 	resp := command.Generate(req)
 	command.Write(resp)
 }
@@ -82,7 +82,7 @@ func SetPackagePrefix(prefix string) func(file *descriptor.FileDescriptorProto) 
 func toCamelCase(input string, firstUpper bool) string {
 	runes := []rune(strings.ToLower(input))
 	outputRunes := make([]rune, 0, len(runes))
-	
+
 	nextUpper := false
 	for i, rune := range runes {
 		if rune == '_' {
@@ -205,29 +205,29 @@ func HandleCustomExtensions(file *descriptor.FileDescriptorProto) func(msg *desc
 				field.Options = &descriptor.FieldOptions{}
 			}
 			deprecated := field.Options.Deprecated != nil && *field.Options.Deprecated == true
-			
+
 			if field.Type != nil && *field.Type == descriptor.FieldDescriptorProto_TYPE_INT32 {
 				SetStringFieldOption(field, gogoproto.E_Casttype, "int")
 			}
-			
+
 			if field.TypeName != nil && *field.TypeName == ".google.protobuf.Timestamp" {
 				vanity.SetBoolFieldOption(gogoproto.E_Stdtime, true)(field)
 			}
-			
+
 			if _, ok := GetFieldBooleanExtension(field, ext.E_Nullable); ok {
 				vanity.SetBoolFieldOption(gogoproto.E_Nullable, true)(field)
 			}
-			
+
 			if goName, ok := GetFieldStringExtension(field, ext.E_Goname); ok {
 				SetStringFieldOption(field, gogoproto.E_Customname, goName)
 			} else if deprecated {
 				SetStringFieldOption(field, gogoproto.E_Customname, "Deprecated"+toCamelCase(*field.Name, true))
 			}
-			
+
 			if goType, ok := GetFieldStringExtension(field, ext.E_Gotype); ok {
 				SetStringFieldOption(field, gogoproto.E_Customtype, goType)
 			}
-			
+
 			if val, ok := GetFieldBooleanExtension(field, ext.E_NodeId); ok && val {
 				if *file.Options.GoPackage != "github.com/superwhys/remoteX/pkg/common" {
 					SetStringFieldOption(field, gogoproto.E_Customtype, "github.com/superwhys/remoteX/pkg/common.NodeID")
@@ -235,13 +235,13 @@ func HandleCustomExtensions(file *descriptor.FileDescriptorProto) func(msg *desc
 					SetStringFieldOption(field, gogoproto.E_Customtype, "NodeID")
 				}
 			}
-			
+
 			if yamlValue, ok := GetFieldStringExtension(field, ext.E_Yaml); ok {
 				SetStringFieldOption(field, gogoproto.E_Moretags, fmt.Sprintf(`yaml:"%s"`, yamlValue))
 			} else {
 				SetStringFieldOption(field, gogoproto.E_Moretags, `yaml:"-"`)
 			}
-			
+
 			if jsonValue, ok := GetFieldStringExtension(field, ext.E_Json); ok {
 				SetStringFieldOption(field, gogoproto.E_Jsontag, jsonValue)
 			} else if deprecated {
@@ -249,12 +249,12 @@ func HandleCustomExtensions(file *descriptor.FileDescriptorProto) func(msg *desc
 			} else {
 				SetStringFieldOption(field, gogoproto.E_Jsontag, toCamelCase(*field.Name, false))
 			}
-			
+
 			current := ""
 			if v, ok := GetFieldStringExtension(field, gogoproto.E_Moretags); ok {
 				current = v
 			}
-			
+
 			SetStringFieldOption(field, gogoproto.E_Moretags, current)
 		})
 	}

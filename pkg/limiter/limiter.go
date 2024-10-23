@@ -8,7 +8,6 @@ import (
 )
 
 const (
-	// 512K
 	limiterBurstSize = 4 * 128 << 10
 )
 
