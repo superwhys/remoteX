@@ -15,6 +15,7 @@ import (
 	"github.com/superwhys/remoteX/internal/connection/listener"
 	"github.com/superwhys/remoteX/pkg/limiter"
 	"github.com/superwhys/remoteX/pkg/svcutils"
+	"github.com/superwhys/remoteX/pkg/tracker"
 	"github.com/thejerf/suture/v4"
 	"golang.org/x/sync/errgroup"
 
@@ -32,7 +33,7 @@ type RemoteXServer struct {
 	connService       connection.Service
 	authService       auth.Service
 	commandService    command.Service
-	limiter           *limiter.Limiter
+	packOpts          *connection.PackOpts
 	heartbeatInterval time.Duration
 	// connections It is a channel used for transmitting successfully established connections
 	// (including listening connections and self created connections)
@@ -51,8 +52,11 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 		connService:       connSrv.NewConnectionService(local.URL(), opt.TlsConfig),
 		commandService:    commandSrv.NewCommandService(),
 		heartbeatInterval: time.Second * time.Duration(opt.Conf.HeartbeatInterval),
-		limiter:           limiter.NewLimiter(local.NodeId, transConf.MaxRecvKbps, transConf.MaxSendKbps),
-		connections:       make(chan connection.TlsConn),
+		packOpts: &connection.PackOpts{
+			Limiter:        limiter.NewLimiter(local.NodeId, transConf.MaxRecvKbps, transConf.MaxSendKbps),
+			TrackerManager: tracker.CreateTrackerManager(),
+		},
+		connections: make(chan connection.TlsConn),
 	}
 
 	listener.InitListener()
@@ -152,6 +156,17 @@ func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn)
 			plog.Debugf("conn{%s} start command handler", conn.GetConnectionId())
 			return s.schedulerCommand(ctx, conn)
 		}
+	})
+
+	eg.Go(func() error {
+		ticket := time.NewTicker(time.Millisecond * 500)
+		defer ticket.Stop()
+		for range ticket.C {
+			snap := s.packOpts.TrackerManager.Snapshot()
+			plog.Debugf("trafficInfo: %+v", snap)
+		}
+
+		return nil
 	})
 
 	if err := eg.Wait(); err != nil {

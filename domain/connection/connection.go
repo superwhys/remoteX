@@ -13,6 +13,7 @@ import (
 	"github.com/superwhys/remoteX/pkg/limiter"
 	"github.com/superwhys/remoteX/pkg/protocol"
 	"github.com/superwhys/remoteX/pkg/protoutils"
+	"github.com/superwhys/remoteX/pkg/tracker"
 )
 
 type BaseConnection interface {
@@ -109,6 +110,53 @@ func (c *Connection) SetNodeId(nodeId common.NodeID) {
 	c.NodeId = nodeId
 }
 
+var _ Stream = (*TrackerStream)(nil)
+
+type TrackerStream struct {
+	Stream
+	rd *tracker.TrackerReader
+	wr *tracker.TrackerWriter
+	protoutils.ProtoMessageReader
+	protoutils.ProtoMessageWriter
+}
+
+func PackTrackerStream(manager *tracker.Manager, stream Stream) *TrackerStream {
+	rd := tracker.NewTrackerReader(stream, manager)
+	wr := tracker.NewTrackerWriter(stream, manager)
+
+	return &TrackerStream{
+		Stream:             stream,
+		rd:                 rd,
+		wr:                 wr,
+		ProtoMessageReader: protoutils.NewProtoReader(rd),
+		ProtoMessageWriter: protoutils.NewProtoWriter(wr),
+	}
+}
+
+func (t *TrackerStream) Pack(stream Stream, opts *PackOpts) Stream {
+	return PackTrackerStream(opts.TrackerManager, stream)
+}
+
+func (t *TrackerStream) Read(p []byte) (n int, err error) {
+	return t.rd.Read(p)
+}
+
+func (t *TrackerStream) Write(p []byte) (n int, err error) {
+	return t.wr.Write(p)
+}
+
+func (t *TrackerStream) ReadMessage(message proto.Message) error {
+	return t.ProtoMessageReader.ReadMessage(message)
+}
+
+func (t *TrackerStream) WriteMessage(m proto.Message) error {
+	return t.ProtoMessageWriter.WriteMessage(m)
+}
+
+func (t *TrackerStream) Close() (err error) {
+	return t.Stream.Close()
+}
+
 var _ Stream = (*LimiterStream)(nil)
 
 type LimiterStream struct {
@@ -130,6 +178,10 @@ func PackLimiterStream(stream Stream, limiter *limiter.Limiter) *LimiterStream {
 	}
 }
 
+func (l *LimiterStream) Pack(stream Stream, opts *PackOpts) Stream {
+	return PackLimiterStream(stream, opts.Limiter)
+}
+
 // Read rewrite the method to use LimiterReader
 func (l *LimiterStream) Read(p []byte) (n int, err error) {
 	return l.rd.Read(p)
@@ -149,14 +201,7 @@ func (l *LimiterStream) WriteMessage(m proto.Message) error {
 }
 
 func (l *LimiterStream) Close() (err error) {
-	err = l.ProtoMessageReader.Close()
-	err = l.ProtoMessageWriter.Close()
-	err = l.Stream.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return l.Stream.Close()
 }
 
 var _ Stream = (*CounterStream)(nil)
@@ -181,6 +226,10 @@ func PackCounterStream(stream Stream) *CounterStream {
 		ProtoMessageReader: protoutils.NewProtoReader(crd),
 		ProtoMessageWriter: protoutils.NewProtoWriter(cwr),
 	}
+}
+
+func (cc *CounterStream) Pack(stream Stream, _ *PackOpts) Stream {
+	return PackCounterStream(stream)
 }
 
 // Read rewrite the method to use CountingReader
