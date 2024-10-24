@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"io"
 	"net"
+	"net/url"
 	"time"
 
 	"github.com/go-puzzles/puzzles/plog"
@@ -51,6 +52,7 @@ type TlsConn interface {
 
 	IsServer() bool
 	GetConnectionId() string
+	GetDialURL() *url.URL
 	SetStatus(status protocol.ConnectionStatus)
 	UpdateLastHeartbeat()
 
@@ -64,14 +66,24 @@ type InternalConn struct {
 	StreamConnection
 	*Connection
 	isServer bool
+	target   *url.URL
 }
 
-func NewInternalConnection(sc StreamConnection, conn *Connection, isServer bool) *InternalConn {
-	return &InternalConn{sc, conn, isServer}
+func NewInternalConnection(sc StreamConnection, conn *Connection, target *url.URL, isServer bool) *InternalConn {
+	return &InternalConn{
+		sc,
+		conn,
+		isServer,
+		target,
+	}
 }
 
 func (i *InternalConn) IsServer() bool {
 	return i.isServer
+}
+
+func (i *InternalConn) GetDialURL() *url.URL {
+	return i.target
 }
 
 func (i *InternalConn) GetNodeId() common.NodeID {
@@ -259,4 +271,10 @@ func (cc *CounterStream) WriteMessage(m proto.Message) error {
 
 func (cc *CounterStream) Close() error {
 	return cc.Stream.Close()
+}
+
+type DialTask struct {
+	Target   *url.URL
+	NodeId   common.NodeID
+	IsRedial bool
 }

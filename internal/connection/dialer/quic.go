@@ -66,7 +66,7 @@ func (q *quicDialer) Dial(ctx context.Context, target *url.URL) (connection.TlsC
 		LastHeartbeat: time.Now().Unix(),
 	}
 
-	return connection.NewInternalConnection(sc, c, false), nil
+	return connection.NewInternalConnection(sc, c, target, false), nil
 }
 
 type QuicDialerFactory struct{}

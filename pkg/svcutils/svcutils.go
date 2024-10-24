@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
 	"github.com/thejerf/suture/v4"
 )
@@ -73,12 +74,12 @@ func (s *service) String() string {
 func waitContext(ctx context.Context, err error) error {
 	select {
 	case <-ctx.Done():
+		plog.Errorf("waitContext done")
 		return ctx.Err()
 	default:
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return nil
-		return fmt.Errorf("%s (non-context)", err.Error())
 	}
 	return err
 }

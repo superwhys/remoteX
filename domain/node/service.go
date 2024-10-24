@@ -11,6 +11,7 @@ type Service interface {
 	GetLocal() *Node
 	RefreshCurrentNode() (*Node, error)
 	GetNodeStatus(nodeId common.NodeID) (NodeStatus, error)
+	UpdateNode(n *Node) error
 	UpdateNodeStatus(nodeId common.NodeID, status NodeStatus) error
 	UpdateHeartbeat(nodeId common.NodeID) error
 }

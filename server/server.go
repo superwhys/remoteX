@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"iter"
 	"time"
 
 	"github.com/go-puzzles/puzzles/plog"
@@ -35,6 +34,7 @@ type RemoteXServer struct {
 	commandService    command.Service
 	packOpts          *connection.PackOpts
 	heartbeatInterval time.Duration
+	dialers           chan *connection.DialTask
 	// connections It is a channel used for transmitting successfully established connections
 	// (including listening connections and self created connections)
 	connections chan connection.TlsConn
@@ -56,13 +56,13 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 			Limiter:        limiter.NewLimiter(local.NodeId, transConf.MaxRecvKbps, transConf.MaxSendKbps),
 			TrackerManager: tracker.CreateTrackerManager(),
 		},
+		dialers:     make(chan *connection.DialTask),
 		connections: make(chan connection.TlsConn),
 	}
 
 	listener.InitListener()
 	dialer.InitDialer()
 
-	// TODO: retry while server was down
 	server.Add(svcutils.AsService(server.StartDialer, "startDialer"))
 	server.Add(svcutils.AsService(server.StartListener, "startListener"))
 	server.Add(svcutils.AsService(server.HandleConnection, "handleConnection"))
@@ -71,19 +71,41 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 }
 
 func (s *RemoteXServer) StartDialer(ctx context.Context) error {
-	for _, client := range s.opt.Conf.DialClients {
-		target := client.URL()
+	go func() {
+		for _, client := range s.opt.Conf.DialClients {
+			s.dialers <- &connection.DialTask{
+				Target: client.URL(),
+			}
+		}
+	}()
 
-		conn, err := s.connService.EstablishConnection(ctx, target)
+	for {
+		var task *connection.DialTask
+		select {
+		case <-ctx.Done():
+			close(s.dialers)
+			return ctx.Err()
+		case task = <-s.dialers:
+		}
+
+		// if dial task is redial task
+		// update the node status to Connecting
+		if task.IsRedial && task.NodeId != "" {
+			s.nodeService.UpdateNodeStatus(task.NodeId, node.NodeStatusConnecting)
+		}
+
+		conn, err := s.connService.EstablishConnection(ctx, task.Target)
 		if err != nil {
-			return errors.Wrap(err, "failed to establish connection")
+			if !task.IsRedial {
+				return errors.Wrap(err, "failed to establish connection")
+			}
+			s.nodeService.UpdateNodeStatus(task.NodeId, node.NodeStatusOffline)
+			s.connectionRedial(task.NodeId, task.Target)
+			continue
 		}
 
 		s.connections <- conn
 	}
-
-	<-ctx.Done()
-	return nil
 }
 
 func (s *RemoteXServer) StartListener(ctx context.Context) error {
@@ -92,8 +114,17 @@ func (s *RemoteXServer) StartListener(ctx context.Context) error {
 
 func (s *RemoteXServer) HandleConnection(ctx context.Context) error {
 	for remote, conn := range s.connectionPrepareIter(ctx) {
-		if err := s.registerNode(remote); err != nil {
-			plog.Errorf("register node: %v error: %v", remote, err)
+		// check whether the remote node is exists
+		// if exists, just update the nodeInfo
+		var err error
+		n, _ := s.nodeService.GetNode(remote.NodeId)
+		if n != nil {
+			err = s.nodeService.UpdateNode(remote)
+		} else {
+			err = s.registerNode(remote)
+		}
+		if err != nil {
+			plog.Errorf("update/register remote node: %v error: %v", remote, err)
 			conn.Close()
 			continue
 		}
@@ -104,38 +135,6 @@ func (s *RemoteXServer) HandleConnection(ctx context.Context) error {
 		go s.background(ctx, conn)
 	}
 	return nil
-}
-
-func (s *RemoteXServer) connectionPrepareIter(ctx context.Context) iter.Seq2[*node.Node, connection.TlsConn] {
-	return func(yield func(*node.Node, connection.TlsConn) bool) {
-		for {
-			var conn connection.TlsConn
-			select {
-			case <-ctx.Done():
-				break
-			case conn = <-s.connections:
-			}
-
-			if err := s.connService.CheckConnection(conn); err != nil {
-				plog.Errorf("check connection err: %v", err)
-				conn.Close()
-				continue
-			}
-
-			remote, err := s.connectionHandshake(conn)
-			if err != nil {
-				plog.Errorf("listen connection handshake err: %v", err)
-				conn.Close()
-				continue
-			}
-
-			if !yield(remote, conn) {
-				plog.Errorf("yield remoteNode and TlsConn error")
-				conn.Close()
-				break
-			}
-		}
-	}
 }
 
 func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn) {
@@ -158,32 +157,13 @@ func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn)
 		}
 	})
 
-	eg.Go(func() error {
-		ticket := time.NewTicker(time.Millisecond * 500)
-		defer ticket.Stop()
-		for range ticket.C {
-			snap := s.packOpts.TrackerManager.Snapshot()
-			plog.Debugf("trafficInfo: %+v", snap)
-		}
-
-		return nil
-	})
-
 	if err := eg.Wait(); err != nil {
 		plog.Errorf("failed to run background connection: %v", err)
 		s.nodeService.UpdateNodeStatus(conn.GetNodeId(), node.NodeStatusOffline)
-		s.CloseConn(conn)
+		s.CloseConnection(conn)
 	}
 }
 
 func (s *RemoteXServer) registerNode(n *node.Node) error {
 	return s.nodeService.RegisterNode(n)
-}
-
-func (s *RemoteXServer) registerConnection(conn connection.TlsConn) {
-	s.connService.RegisterConnection(conn)
-}
-
-func (s *RemoteXServer) CloseConn(conn connection.TlsConn) {
-	s.connService.CloseConnection(conn.GetConnectionId())
 }

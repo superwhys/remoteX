@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"net/url"
-	
+
 	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/pkg/common"
 	"github.com/superwhys/remoteX/pkg/errorutils"
@@ -34,7 +34,7 @@ func (s *ServiceImpl) CreateListener(ctx context.Context, connCh chan<- connecti
 		return errorutils.ErrConnection("", errorutils.WithError(err))
 	}
 	lis := creator.New(s.local, s.tlsConf)
-	
+
 	return lis.Listen(ctx, connCh)
 }
 
@@ -43,7 +43,7 @@ func (s *ServiceImpl) EstablishConnection(ctx context.Context, target *url.URL) 
 	if err != nil {
 		return nil, errorutils.ErrConnection("", errorutils.WithError(err))
 	}
-	
+
 	streamConn, err := dialFactory.New(s.local, s.tlsConf).Dial(ctx, target)
 	if err != nil {
 		return nil, errorutils.ErrConnection(
@@ -52,7 +52,7 @@ func (s *ServiceImpl) EstablishConnection(ctx context.Context, target *url.URL) 
 			errorutils.WithMsg("failed to establish connection"),
 		)
 	}
-	
+
 	return streamConn, nil
 }
 
@@ -62,13 +62,13 @@ func (s *ServiceImpl) CheckConnection(conn connection.TlsConn) error {
 	if cl := len(certs); cl != 1 {
 		return errorutils.ErrConnection(conn.GetConnectionId(), errorutils.WithMsg("peer certificate invalidate"))
 	}
-	
+
 	remoteCert := certs[0]
 	remoteID := common.NewNodeID(remoteCert.Raw)
 	if remoteID.String() == s.localNodeId {
 		return errorutils.ErrConnectToMyself(remoteID, conn.GetConnectionId())
 	}
-	
+
 	return nil
 }
 

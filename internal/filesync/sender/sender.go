@@ -192,7 +192,9 @@ func (st *SendTransfer) GetFileList(root string) iter.Seq[*pb.FileBase] {
 				Entry: entry,
 			}
 
-			yield(f)
+			if !yield(f) {
+				break
+			}
 		}
 	}
 }

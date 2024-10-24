@@ -88,7 +88,7 @@ func (s *RemoteXServer) listRemoteDir(c *gin.Context, req *listRemoteDir) {
 	pgin.ReturnSuccess(c, resp)
 }
 
-type pullEntry struct {
+type syncRequest struct {
 	Target string `json:"target" binding:"required"`
 	Src    string `json:"src" binding:"required"`
 	Dest   string `json:"dest" binding:"required"`
@@ -96,7 +96,7 @@ type pullEntry struct {
 	Whole  bool   `json:"whole"`
 }
 
-func (p *pullEntry) toCommand(t command.CommandType) *command.Command {
+func (p *syncRequest) toCommand(t command.CommandType) *command.Command {
 	return &command.Command{
 		Type: t,
 		Args: map[string]command.Command_Arg{
@@ -108,7 +108,7 @@ func (p *pullEntry) toCommand(t command.CommandType) *command.Command {
 	}
 }
 
-func (s *RemoteXServer) pullEntry(c *gin.Context, req *pullEntry) {
+func (s *RemoteXServer) pullEntry(c *gin.Context, req *syncRequest) {
 	callback := func(ctx context.Context, stream connection.Stream) error {
 		localCmd := req.toCommand(command.Pull)
 		_, err := s.commandService.DoCommand(ctx, localCmd, stream)
@@ -118,7 +118,29 @@ func (s *RemoteXServer) pullEntry(c *gin.Context, req *pullEntry) {
 	remoteCmd := req.toCommand(command.Push)
 	resp, err := s.handleRemoteCommand(c, common.NodeID(req.Target), remoteCmd, callback)
 	if err != nil {
-		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("handle remote command error: %v", err))
+		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("remote handle push command error: %v", err))
+		return
+	}
+
+	pgin.ReturnSuccess(c, resp)
+}
+
+func (s *RemoteXServer) pushEntry(c *gin.Context, req *syncRequest) {
+
+	var (
+		resp *command.Ret
+		err  error
+	)
+	callback := func(ctx context.Context, stream connection.Stream) error {
+		localCmd := req.toCommand(command.Push)
+		resp, err = s.commandService.DoCommand(ctx, localCmd, stream)
+		return errors.Wrapf(err, "localCmd push(%s -> %s)", req.Src, req.Dest)
+	}
+
+	remoteCmd := req.toCommand(command.Pull)
+	_, err = s.handleRemoteCommand(c, common.NodeID(req.Target), remoteCmd, callback)
+	if err != nil {
+		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("remote handle pull command error: %v", err))
 		return
 	}
 

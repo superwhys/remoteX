@@ -9,12 +9,13 @@ import (
 
 	"github.com/quic-go/quic-go"
 	"github.com/superwhys/remoteX/domain/connection"
+	"github.com/superwhys/remoteX/pkg/errorutils"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
 var (
 	QuicConfig = &quic.Config{
-		MaxIdleTimeout:  30 * time.Second,
+		MaxIdleTimeout:  5 * time.Second,
 		KeepAlivePeriod: 15 * time.Second,
 	}
 )
@@ -69,7 +70,9 @@ func (c *QuicConnection) SetWriteDeadline(_ time.Time) error {
 
 func (c *QuicConnection) AcceptStream() (connection.Stream, error) {
 	stream, err := c.quicConn.AcceptStream(context.TODO())
-	if err != nil {
+	if idleErr, ok := err.(*quic.IdleTimeoutError); ok {
+		return nil, errorutils.ErrConnectionRemoteDead(c.connId, idleErr)
+	} else if err != nil {
 		return nil, err
 	}
 

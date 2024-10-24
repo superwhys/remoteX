@@ -11,6 +11,7 @@ func (s *RemoteXServer) SetupHttpServer() *gin.Engine {
 	router.GET("/node", s.getAllNodes())
 	router.GET("/list/dir", pgin.RequestHandler(s.listDir))
 	router.POST("/sync/pull", pgin.RequestHandler(s.pullEntry))
+	router.POST("/sync/push", pgin.RequestHandler(s.pushEntry))
 
 	nodeRouter := router.Group("/node/:nodeId")
 	{

@@ -99,7 +99,7 @@ func (l *QuicListener) Listen(ctx context.Context, connections chan<- connection
 			StartTime:     time.Now().Unix(),
 			LastHeartbeat: time.Now().Unix(),
 		}
-		ic := connection.NewInternalConnection(sc, c, true)
+		ic := connection.NewInternalConnection(sc, c, l.local, true)
 		connections <- ic
 	}
 }

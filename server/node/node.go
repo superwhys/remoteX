@@ -89,12 +89,25 @@ func (ds *ServiceImpl) RefreshCurrentNode() (*node.Node, error) {
 	return currentNode, nil
 }
 
+func (ds *ServiceImpl) UpdateNode(n *node.Node) error {
+	n, ok := ds.nodes[n.NodeId]
+	if !ok {
+		return errorutils.ErrNodeNotFound(n.NodeId)
+	}
+
+	ds.nodes[n.NodeId] = n
+	return nil
+}
+
 func (ds *ServiceImpl) UpdateNodeStatus(nodeId common.NodeID, status node.NodeStatus) error {
 	n, ok := ds.nodes[nodeId]
 	if !ok {
 		return errorutils.ErrNodeNotFound(nodeId)
 	}
 	n.Status = status
+	if status == node.NodeStatusOffline {
+		n.ConnectionId = ""
+	}
 	return nil
 }
 

@@ -5,8 +5,10 @@ import (
 	"net"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/pkg/common"
+	"github.com/superwhys/remoteX/pkg/errorutils"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 	"github.com/xtaci/smux"
 )
@@ -72,7 +74,11 @@ func (c *TcpConnection) SetWriteDeadline(t time.Time) error {
 func (c *TcpConnection) AcceptStream() (connection.Stream, error) {
 	s, err := c.session.AcceptStream()
 	if err != nil {
-		return nil, err
+		opErr := new(net.OpError)
+		if errors.As(err, &opErr) && !opErr.Timeout() {
+			return nil, errorutils.ErrConnectionRemoteDead(c.connId, opErr)
+		}
+		return nil, errors.Wrap(err, "acceptStream")
 	}
 
 	return NewTcpStream(c.connId, s), nil

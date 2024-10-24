@@ -2,7 +2,7 @@ package errorutils
 
 import (
 	"fmt"
-	
+
 	"github.com/superwhys/remoteX/pkg/common"
 )
 
@@ -16,11 +16,11 @@ func ErrConnection(connId string, opts ...ErrOption) *ConnectionError {
 		BaseError:    &BaseError{},
 		connectionId: connId,
 	}
-	
+
 	for _, opt := range opts {
 		opt(e.BaseError)
 	}
-	
+
 	return e
 }
 
@@ -56,4 +56,19 @@ func ErrConnectNotFound(connectionId string) *ConnectNotFoundError {
 	return &ConnectNotFoundError{
 		ConnectionError: &ConnectionError{connectionId: connectionId},
 	}
+}
+
+type ConnectionRemoteDeadError struct {
+	*ConnectionError
+}
+
+func ErrConnectionRemoteDead(connectionId string, err error) *ConnectionRemoteDeadError {
+	return &ConnectionRemoteDeadError{
+		ConnectionError: ErrConnection(connectionId, WithError(err)),
+	}
+}
+
+func IsRemoteDead(err error) bool {
+	_, ok := err.(*ConnectionRemoteDeadError)
+	return ok
 }

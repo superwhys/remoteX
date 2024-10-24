@@ -3,13 +3,13 @@ package server
 import (
 	"context"
 	"fmt"
-	"net"
 
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/pkg/common"
+	"github.com/superwhys/remoteX/pkg/errorutils"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -17,16 +17,17 @@ func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.Tl
 	for {
 		select {
 		case <-ctx.Done():
-			plog.Errorf("context done: %v", ctx.Err())
 			return ctx.Err()
 		default:
 			stream, err := conn.AcceptStream()
-			if err != nil {
-				opErr := new(net.OpError)
-				if errors.As(err, &opErr) && !opErr.Timeout() {
-					return errors.Wrap(err, "acceptStream")
+			if errorutils.IsRemoteDead(err) {
+				plog.Errorf("remote(%v) was down", conn.RemoteAddr())
+				// if server node was down, it will try to reconnect to server again
+				if !conn.IsServer() {
+					s.connectionRedial(conn.GetNodeId(), conn.GetDialURL())
 				}
-
+				return err
+			} else if err != nil {
 				continue
 			}
 
