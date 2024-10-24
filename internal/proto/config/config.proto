@@ -12,7 +12,7 @@ message TlsConfig {
 
 message Config {
   node.Node local_node = 1 [(ext.yaml) = "local_node", (ext.nullable) = true];
-  TlsConfig tls = 2 [(ext.yaml) = "tlsutils", (ext.nullable) = true];
+  TlsConfig tls = 2 [(ext.yaml) = "tls", (ext.nullable) = true];
   node.NodeTransConfiguration trans_conf = 3 [(ext.yaml) = "trans_conf", (ext.nullable) = true];
   repeated protocol.Address dial_clients = 4 [(ext.yaml) = "dial_clients", (ext.nullable) = true];
   int64 heartbeat_interval = 5 [(ext.yaml) = "heartbeat_interval"];

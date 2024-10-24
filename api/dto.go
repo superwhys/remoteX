@@ -1,8 +1,8 @@
-package server
+package api
 
 import (
 	"fmt"
-
+	
 	"github.com/superwhys/remoteX/domain/node"
 )
 
@@ -26,10 +26,10 @@ func NodeToDto(n *node.Node) *NodeDto {
 	}
 }
 
-func NodesToDtos(nodes []*node.Node) []*NodeDto {
-	var dtos []*NodeDto
+func NodesToDto(nodes []*node.Node) []*NodeDto {
+	var ns []*NodeDto
 	for _, n := range nodes {
-		dtos = append(dtos, NodeToDto(n))
+		ns = append(ns, NodeToDto(n))
 	}
-	return dtos
+	return ns
 }

@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"time"
-
+	
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/auth"
@@ -17,7 +17,7 @@ import (
 	"github.com/superwhys/remoteX/pkg/tracker"
 	"github.com/thejerf/suture/v4"
 	"golang.org/x/sync/errgroup"
-
+	
 	authSrv "github.com/superwhys/remoteX/server/auth"
 	commandSrv "github.com/superwhys/remoteX/server/command"
 	connSrv "github.com/superwhys/remoteX/server/connection"
@@ -26,15 +26,17 @@ import (
 
 type RemoteXServer struct {
 	*suture.Supervisor
-
+	
+	NodeService    node.Service
+	ConnService    connection.Service
+	AuthService    auth.Service
+	CommandService command.Service
+	
 	opt               *Option
-	nodeService       node.Service
-	connService       connection.Service
-	authService       auth.Service
-	commandService    command.Service
 	packOpts          *connection.PackOpts
 	heartbeatInterval time.Duration
-	dialers           chan *connection.DialTask
+	
+	dialTasks chan *connection.DialTask
 	// connections It is a channel used for transmitting successfully established connections
 	// (including listening connections and self created connections)
 	connections chan connection.TlsConn
@@ -46,80 +48,80 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 	server := &RemoteXServer{
 		opt:        opt,
 		Supervisor: suture.NewSimple("RemoteX.Service"),
-
-		nodeService:       nodeSrv.NewNodeService(local),
-		authService:       authSrv.NewSimpleAuthService(),
-		connService:       connSrv.NewConnectionService(local.URL(), opt.TlsConfig),
-		commandService:    commandSrv.NewCommandService(),
+		
+		NodeService:       nodeSrv.NewNodeService(local),
+		AuthService:       authSrv.NewSimpleAuthService(),
+		ConnService:       connSrv.NewConnectionService(local.URL(), opt.TlsConfig),
+		CommandService:    commandSrv.NewCommandService(),
 		heartbeatInterval: time.Second * time.Duration(opt.Conf.HeartbeatInterval),
 		packOpts: &connection.PackOpts{
 			Limiter:        limiter.NewLimiter(local.NodeId, transConf.MaxRecvKbps, transConf.MaxSendKbps),
 			TrackerManager: tracker.CreateTrackerManager(),
 		},
-		dialers:     make(chan *connection.DialTask),
+		dialTasks:   make(chan *connection.DialTask),
 		connections: make(chan connection.TlsConn),
 	}
-
+	
 	listener.InitListener()
 	dialer.InitDialer()
-
-	server.Add(svcutils.AsService(server.StartDialer, "startDialer"))
-	server.Add(svcutils.AsService(server.StartListener, "startListener"))
-	server.Add(svcutils.AsService(server.HandleConnection, "handleConnection"))
-
+	
+	server.Add(svcutils.AsService(server.startDialer, "startDialer"))
+	server.Add(svcutils.AsService(server.startListener, "startListener"))
+	server.Add(svcutils.AsService(server.handleConnection, "handleConnection"))
+	
 	return server
 }
 
-func (s *RemoteXServer) StartDialer(ctx context.Context) error {
+func (s *RemoteXServer) startDialer(ctx context.Context) error {
 	go func() {
 		for _, client := range s.opt.Conf.DialClients {
-			s.dialers <- &connection.DialTask{
+			s.dialTasks <- &connection.DialTask{
 				Target: client.URL(),
 			}
 		}
 	}()
-
+	
 	for {
 		var task *connection.DialTask
 		select {
 		case <-ctx.Done():
-			close(s.dialers)
+			close(s.dialTasks)
 			return ctx.Err()
-		case task = <-s.dialers:
+		case task = <-s.dialTasks:
 		}
-
+		
 		// if dial task is redial task
 		// update the node status to Connecting
 		if task.IsRedial && task.NodeId != "" {
-			s.nodeService.UpdateNodeStatus(task.NodeId, node.NodeStatusConnecting)
+			_ = s.NodeService.UpdateNodeStatus(task.NodeId, node.NodeStatusConnecting)
 		}
-
-		conn, err := s.connService.EstablishConnection(ctx, task.Target)
+		
+		conn, err := s.ConnService.EstablishConnection(ctx, task.Target)
 		if err != nil {
 			if !task.IsRedial {
 				return errors.Wrap(err, "failed to establish connection")
 			}
-			s.nodeService.UpdateNodeStatus(task.NodeId, node.NodeStatusOffline)
+			_ = s.NodeService.UpdateNodeStatus(task.NodeId, node.NodeStatusOffline)
 			s.connectionRedial(task.NodeId, task.Target)
 			continue
 		}
-
+		
 		s.connections <- conn
 	}
 }
 
-func (s *RemoteXServer) StartListener(ctx context.Context) error {
-	return s.connService.CreateListener(ctx, s.connections)
+func (s *RemoteXServer) startListener(ctx context.Context) error {
+	return s.ConnService.CreateListener(ctx, s.connections)
 }
 
-func (s *RemoteXServer) HandleConnection(ctx context.Context) error {
-	for remote, conn := range s.connectionPrepareIter(ctx) {
-		// check whether the remote node is exists
+func (s *RemoteXServer) handleConnection(ctx context.Context) error {
+	for remote, conn := range s.connectionHandshakeIter(ctx) {
+		// check whether the remote node is existing
 		// if exists, just update the nodeInfo
 		var err error
-		n, _ := s.nodeService.GetNode(remote.NodeId)
+		n, _ := s.NodeService.GetNode(remote.NodeId)
 		if n != nil {
-			err = s.nodeService.UpdateNode(remote)
+			err = s.NodeService.UpdateNode(remote)
 		} else {
 			err = s.registerNode(remote)
 		}
@@ -128,10 +130,10 @@ func (s *RemoteXServer) HandleConnection(ctx context.Context) error {
 			conn.Close()
 			continue
 		}
-
+		
 		s.registerConnection(conn)
-		plog.Debugf("register connection: %v. NodeId: %v", conn.GetConnectionId(), conn.GetNodeId())
-
+		plog.Infof("register connection: %v. NodeId: %v", conn.GetConnectionId(), conn.GetNodeId())
+		
 		go s.background(ctx, conn)
 	}
 	return nil
@@ -139,13 +141,13 @@ func (s *RemoteXServer) HandleConnection(ctx context.Context) error {
 
 func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn) {
 	eg, ctx := errgroup.WithContext(ctx)
-
+	
 	hbStartNotify := make(chan struct{})
-
+	
 	eg.Go(func() error {
 		return s.schedulerHeartbeat(ctx, conn, hbStartNotify)
 	})
-
+	
 	// must be called after heartbeat is start
 	eg.Go(func() error {
 		select {
@@ -156,14 +158,14 @@ func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn)
 			return s.schedulerCommand(ctx, conn)
 		}
 	})
-
+	
 	if err := eg.Wait(); err != nil {
 		plog.Errorf("failed to run background connection: %v", err)
-		s.nodeService.UpdateNodeStatus(conn.GetNodeId(), node.NodeStatusOffline)
+		_ = s.NodeService.UpdateNodeStatus(conn.GetNodeId(), node.NodeStatusOffline)
 		s.CloseConnection(conn)
 	}
 }
 
 func (s *RemoteXServer) registerNode(n *node.Node) error {
-	return s.nodeService.RegisterNode(n)
+	return s.NodeService.RegisterNode(n)
 }
