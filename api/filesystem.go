@@ -25,7 +25,7 @@ func (l *listDirReq) toCommand(t command.CommandType) *command.Command {
 
 func (a *RemoteXAPI) listDir(c *gin.Context, req *listDirReq) {
 	cmd := req.toCommand(command.Listdir)
-	ret, err := a.srv.CommandService.DoCommand(c, cmd, nil)
+	ret, err := a.srv.HandleCommand(c, cmd, nil)
 	if err != nil {
 		pgin.ReturnError(c, http.StatusInternalServerError, err.Error())
 		return

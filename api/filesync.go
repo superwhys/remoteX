@@ -36,7 +36,7 @@ func (p *syncRequest) toCommand(t command.CommandType) *command.Command {
 func (a *RemoteXAPI) pullEntry(c *gin.Context, req *syncRequest) {
 	callback := func(ctx context.Context, stream connection.Stream) error {
 		localCmd := req.toCommand(command.Pull)
-		_, err := a.srv.CommandService.DoCommand(ctx, localCmd, stream)
+		_, err := a.srv.HandleCommand(ctx, localCmd, stream)
 		return errors.Wrapf(err, "localCmd pull(%s -> %s)", req.Src, req.Dest)
 	}
 	
@@ -57,7 +57,7 @@ func (a *RemoteXAPI) pushEntry(c *gin.Context, req *syncRequest) {
 	)
 	callback := func(ctx context.Context, stream connection.Stream) error {
 		localCmd := req.toCommand(command.Push)
-		resp, err = a.srv.CommandService.DoCommand(ctx, localCmd, stream)
+		resp, err = a.srv.HandleCommand(ctx, localCmd, stream)
 		return errors.Wrapf(err, "localCmd push(%s -> %s)", req.Src, req.Dest)
 	}
 	

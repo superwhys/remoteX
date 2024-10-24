@@ -32,10 +32,11 @@ func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.Tl
 			}
 			
 			go func(stream connection.Stream) {
+				defer stream.Close()
+				
 				// pack tracker, limiter and counter
 				stream = connection.PackStream(stream, s.packOpts)
-				
-				if err := s.handleCommand(ctx, stream); err != nil {
+				if err := s.receiveAndHandleCommand(ctx, stream); err != nil {
 					plog.Errorf("handle command error: %v", err)
 				}
 			}(stream)
@@ -43,7 +44,7 @@ func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.Tl
 	}
 }
 
-func (s *RemoteXServer) handleCommand(ctx context.Context, stream connection.Stream) error {
+func (s *RemoteXServer) receiveAndHandleCommand(ctx context.Context, stream connection.Stream) error {
 	cmd := &command.Command{}
 	if err := stream.ReadMessage(cmd); err != nil {
 		return errors.Wrap(err, "readMessage")
@@ -51,22 +52,16 @@ func (s *RemoteXServer) handleCommand(ctx context.Context, stream connection.Str
 	
 	plog.Debugf("received command: %v", cmd)
 	
-	resp, err := s.CommandService.DoCommand(ctx, cmd, stream)
+	resp, err := s.HandleCommand(ctx, cmd, stream)
 	if err != nil {
-		if resp == nil {
-			resp = &command.Ret{}
-		}
-		
-		if resp.ErrMsg == "" {
-			resp.ErrMsg = fmt.Sprintf("handle command failed: %v", err)
-		}
+		return stream.WriteMessage(&command.Ret{ErrMsg: fmt.Sprintf("handle command failed: %v", err)})
 	}
 	
-	if err := stream.WriteMessage(resp); err != nil {
-		return errors.Wrap(err, "writeMessage")
-	}
-	
-	return nil
+	return stream.WriteMessage(resp)
+}
+
+func (s *RemoteXServer) HandleCommand(ctx context.Context, cmd *command.Command, stream connection.Stream) (*command.Ret, error) {
+	return s.CommandService.DoCommand(ctx, cmd, stream)
 }
 
 type callbackFn func(ctx context.Context, stream connection.Stream) error
@@ -95,7 +90,6 @@ func (s *RemoteXServer) HandleRemoteCommand(ctx context.Context, nodeId common.N
 }
 
 func (s *RemoteXServer) handleRemoteStream(ctx context.Context, stream connection.Stream, cmd *command.Command, callback callbackFn) (resp *command.Ret, err error) {
-	
 	eg, ctx := errgroup.WithContext(ctx)
 	
 	if callback != nil {
