@@ -1,11 +1,10 @@
-package tls
+package pemutils
 
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
@@ -15,10 +14,6 @@ import (
 	"time"
 	
 	"github.com/pkg/errors"
-)
-
-var (
-	tlsHandshakeTimeout = 10 * time.Second
 )
 
 func pemBlockForKey(priv interface{}) (*pem.Block, error) {
@@ -36,8 +31,8 @@ func pemBlockForKey(priv interface{}) (*pem.Block, error) {
 	}
 }
 
-// generateCertificate generates a PEM formatted key pair and self-signed certificate in memory.
-func generateCertificate(commonName string, lifetimeDays int) (*pem.Block, *pem.Block, error) {
+// GenerateCertificate generates a PEM formatted key pair and self-signed certificate in memory.
+func GenerateCertificate(commonName string, lifetimeDays int) (*pem.Block, *pem.Block, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generate key: %w", err)
@@ -55,7 +50,7 @@ func generateCertificate(commonName string, lifetimeDays int) (*pem.Block, *pem.
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			CommonName:         commonName,
-			Organization:       []string{"Syncthing"},
+			Organization:       []string{"RemoteX"},
 			OrganizationalUnit: []string{"Automatically Generated"},
 		},
 		DNSNames:              []string{commonName},
@@ -77,53 +72,31 @@ func generateCertificate(commonName string, lifetimeDays int) (*pem.Block, *pem.
 	if err != nil {
 		return nil, nil, fmt.Errorf("save key: %w", err)
 	}
-	
 	return certBlock, keyBlock, nil
 }
 
-// NewCertificate generates and returns a new TLS certificate, saved to the given PEM files.
-func NewCertificate(certFile, keyFile string, commonName string, lifetimeDays int) (tls.Certificate, error) {
-	certBlock, keyBlock, err := generateCertificate(commonName, lifetimeDays)
-	if err != nil {
-		return tls.Certificate{}, err
-	}
-	
+func SaveCertificate(certFile, keyFile string, certBlock, keyBlock *pem.Block) error {
 	certOut, err := os.Create(certFile)
 	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("save certutils: %w", err)
+		return fmt.Errorf("save certutils: %w", err)
 	}
 	if err = pem.Encode(certOut, certBlock); err != nil {
-		return tls.Certificate{}, fmt.Errorf("save certutils: %w", err)
+		return fmt.Errorf("save certutils: %w", err)
 	}
 	if err = certOut.Close(); err != nil {
-		return tls.Certificate{}, fmt.Errorf("save certutils: %w", err)
+		return fmt.Errorf("save certutils: %w", err)
 	}
 	
 	keyOut, err := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("save key: %w", err)
+		return fmt.Errorf("save key: %w", err)
 	}
 	if err = pem.Encode(keyOut, keyBlock); err != nil {
-		return tls.Certificate{}, fmt.Errorf("save key: %w", err)
+		return fmt.Errorf("save key: %w", err)
 	}
 	if err = keyOut.Close(); err != nil {
-		return tls.Certificate{}, fmt.Errorf("save key: %w", err)
+		return fmt.Errorf("save key: %w", err)
 	}
 	
-	return tls.X509KeyPair(pem.EncodeToMemory(certBlock), pem.EncodeToMemory(keyBlock))
-}
-
-func TlsTimedHandshake(tc *tls.Conn) error {
-	tc.SetDeadline(time.Now().Add(tlsHandshakeTimeout))
-	defer tc.SetDeadline(time.Time{})
-	
-	return tc.Handshake()
-}
-
-func LocalHost(tc *tls.Conn) string {
-	return fmt.Sprintf("%s://%s", tc.LocalAddr().Network(), tc.LocalAddr().String())
-}
-
-func RemoteHost(tc *tls.Conn) string {
-	return fmt.Sprintf("%s://%s", tc.RemoteAddr().Network(), tc.RemoteAddr().String())
+	return nil
 }

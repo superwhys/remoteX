@@ -79,7 +79,7 @@ func (m *TlsConfig) GetKeyFile() string {
 
 type Config struct {
 	LocalNode         *node.Node                   `protobuf:"bytes,1,opt,name=local_node,json=localNode,proto3" json:"localNode" yaml:"local_node"`
-	Tls               *TlsConfig                   `protobuf:"bytes,2,opt,name=tls,proto3" json:"tls" yaml:"tls"`
+	Tls               *TlsConfig                   `protobuf:"bytes,2,opt,name=tlsutils,proto3" json:"tlsutils" yaml:"tlsutils"`
 	TransConf         *node.NodeTransConfiguration `protobuf:"bytes,3,opt,name=trans_conf,json=transConf,proto3" json:"transConf" yaml:"trans_conf"`
 	DialClients       []*protocol.Address          `protobuf:"bytes,4,rep,name=dial_clients,json=dialClients,proto3" json:"dialClients" yaml:"dial_clients"`
 	HeartbeatInterval int64                        `protobuf:"varint,5,opt,name=heartbeat_interval,json=heartbeatInterval,proto3" json:"heartbeatInterval" yaml:"heartbeat_interval"`

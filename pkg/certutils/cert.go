@@ -2,10 +2,11 @@ package certutils
 
 import (
 	"crypto/tls"
+	"encoding/pem"
 	
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/superwhys/remoteX/config"
-	tlsutils "github.com/superwhys/remoteX/internal/tls"
+	"github.com/superwhys/remoteX/pkg/pemutils"
 )
 
 var (
@@ -23,5 +24,19 @@ func LoadOrGenerateCertificate(certConf *config.TlsConfig) (tls.Certificate, err
 }
 
 func GenerateCertificate(certFile, keyFile string) (tls.Certificate, error) {
-	return tlsutils.NewCertificate(certFile, keyFile, tlsDefaultCommonName, deviceCertLifetimeDays)
+	return NewCertificate(certFile, keyFile, tlsDefaultCommonName, deviceCertLifetimeDays)
+}
+
+// NewCertificate generates and returns a new TLS certificate, saved to the given PEM files.
+func NewCertificate(certFile, keyFile string, commonName string, lifetimeDays int) (tls.Certificate, error) {
+	certBlock, keyBlock, err := pemutils.GenerateCertificate(commonName, lifetimeDays)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	
+	if err := pemutils.SaveCertificate(certFile, keyFile, certBlock, keyBlock); err != nil {
+		return tls.Certificate{}, err
+	}
+	
+	return tls.X509KeyPair(pem.EncodeToMemory(certBlock), pem.EncodeToMemory(keyBlock))
 }

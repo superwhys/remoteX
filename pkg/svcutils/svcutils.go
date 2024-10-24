@@ -4,25 +4,11 @@ import (
 	"context"
 	"fmt"
 	"sync"
-
+	
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
 	"github.com/thejerf/suture/v4"
 )
-
-type ExitStatus int
-
-const (
-	ExitSuccess            ExitStatus = 0
-	ExitError              ExitStatus = 1
-	ExitNoUpgradeAvailable ExitStatus = 2
-	ExitRestart            ExitStatus = 3
-	ExitUpgrade            ExitStatus = 4
-)
-
-func (s ExitStatus) AsInt() int {
-	return int(s)
-}
 
 type ServiceWithError interface {
 	suture.Service
@@ -51,13 +37,13 @@ func (s *service) Serve(ctx context.Context) error {
 	s.mut.Lock()
 	s.err = nil
 	s.mut.Unlock()
-
+	
 	err := waitContext(ctx, s.serve(ctx))
-
+	
 	s.mut.Lock()
 	s.err = err
 	s.mut.Unlock()
-
+	
 	return err
 }
 
