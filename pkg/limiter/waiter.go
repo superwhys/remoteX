@@ -2,7 +2,7 @@ package limiter
 
 import (
 	"context"
-	
+
 	"golang.org/x/time/rate"
 )
 
@@ -23,7 +23,7 @@ func NewBaseWaiter(b int) *BaseWaiter {
 	if currentLimit <= 0 {
 		currentLimit = rate.Inf
 	}
-	
+
 	return &BaseWaiter{
 		Limiter: rate.NewLimiter(currentLimit, limiterBurstSize),
 	}
@@ -46,7 +46,7 @@ func (w *BaseWaiter) SetLimit(newLimit int32) {
 	if currentLimit <= 0 {
 		currentLimit = rate.Inf
 	}
-	
+
 	w.Limiter.SetLimit(currentLimit)
 }
 
@@ -55,7 +55,7 @@ func (w *BaseWaiter) Take(n int) {
 		_ = w.WaitN(context.TODO(), n)
 		return
 	}
-	
+
 	for n > 0 {
 		if n > limiterBurstSize {
 			_ = w.WaitN(context.TODO(), n)

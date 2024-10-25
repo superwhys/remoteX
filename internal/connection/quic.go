@@ -17,6 +17,8 @@ var (
 	QuicConfig = &quic.Config{
 		MaxIdleTimeout:  5 * time.Second,
 		KeepAlivePeriod: 15 * time.Second,
+		// MaxStreamReceiveWindow:     2 * 1024 * 1024,  // 2 MiB
+		// MaxConnectionReceiveWindow: 10 * 1024 * 1024, // 10 MiB
 	}
 )
 
@@ -120,6 +122,12 @@ func (q *QuicStream) RemoteAddr() net.Addr {
 
 func (q *QuicStream) LocalAddr() net.Addr {
 	return q.localAddr
+}
+
+func (q *QuicStream) Close() error {
+	q.Stream.CancelRead(0)
+	q.Stream.CancelWrite(0)
+	return nil
 }
 
 func QuicNetwork(uri *url.URL) string {

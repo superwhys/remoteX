@@ -5,7 +5,7 @@ import (
 	"iter"
 	"os"
 	"path/filepath"
-	
+
 	"github.com/go-puzzles/puzzles/putils"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/internal/filesync/common"
@@ -28,7 +28,7 @@ func (rt *ReceiveTransfer) receiveOpts() (*pb.SyncOpts, error) {
 	if err := rt.Rw.ReadMessage(opts); err != nil {
 		return nil, err
 	}
-	
+
 	return opts, nil
 }
 
@@ -37,10 +37,47 @@ func (rt *ReceiveTransfer) MergeRemoteOpts() error {
 	if err != nil {
 		return errors.Wrap(err, "receiveRemoteOpts")
 	}
-	
+
 	rt.Opts.DryRun = opts.DryRun
 	rt.Opts.Whole = opts.Whole
-	
+
+	return nil
+}
+
+func (rt *ReceiveTransfer) CheckDesk(fileCnt int, dest string) error {
+	info, err := os.Stat(dest)
+	if err != nil && !os.IsNotExist(err) {
+		return errors.Wrap(err, "stat")
+	}
+
+	if info == nil {
+		// dest not exists
+		// if multiple files are received, dest must be a folder
+		// if just has one file and dest is not exists, it will be treated as a file
+		if fileCnt > 1 {
+			rt.DestIsDir = true
+		}
+	} else {
+		rt.DestIsDir = info.IsDir()
+	}
+
+	if fileCnt > 1 && !rt.DestIsDir {
+		return errors.New("dest is not a directory")
+	}
+
+	if rt.DestIsDir && info == nil {
+		err = os.MkdirAll(dest, 0755)
+	} else if !rt.DestIsDir {
+		destBaseDir := filepath.Dir(dest)
+		if !putils.FileExists(destBaseDir) {
+			err = os.MkdirAll(destBaseDir, 0755)
+		}
+	}
+
+	if err != nil {
+		return errors.Wrap(err, "mkdir")
+	}
+
 	return nil
 }
 
@@ -52,31 +89,31 @@ func (rt *ReceiveTransfer) ReceiveFileList(ctx context.Context) (*pb.FileList, e
 			return nil, ctx.Err()
 		default:
 		}
-		
+
 		f := &pb.FileBase{}
 		if err := rt.Rw.ReadMessage(f); err != nil {
 			return nil, err
 		}
-		
+
 		if f.IsEnd {
 			break
 		}
-		
+
 		if f.Entry.Type == filesystem.EntryTypeDir {
 			targetDir := filepath.Join(rt.Dest, f.GetEntry().GetWpath())
 			if err := rt.CheckDir(targetDir); err != nil {
 				return nil, errors.Wrapf(err, "checkdir: %s", targetDir)
 			}
 		}
-		
+
 		fileList.Files = append(fileList.Files, f)
 		if f.GetEntry().GetRegular() {
 			fileList.TotalSize += f.GetEntry().GetSize()
 		}
 	}
-	
+
 	fileList.Sort()
-	
+
 	return &fileList, nil
 }
 
@@ -84,7 +121,7 @@ func (rt *ReceiveTransfer) CheckDir(dir string) error {
 	if putils.FileExists(dir) {
 		return nil
 	}
-	
+
 	return os.MkdirAll(dir, os.FileMode(0755))
 }
 
@@ -95,34 +132,34 @@ func (rt *ReceiveTransfer) CalcFileHashAndSend(ctx context.Context, local string
 			BlockLength: int64(common.BlockSize),
 		})
 	}
-	
+
 	in, err := filesystem.BasicFs.OpenFile(local)
 	if err != nil {
 		return errors.Wrapf(err, "openFile: %s", local)
 	}
-	
+
 	fileLen, err := putils.FileSize(local)
 	if err != nil {
 		return errors.Wrapf(err, "calcFileSize: %s", local)
 	}
-	
+
 	head := hash.CalcHashHead(fileLen)
 	if err := rt.Rw.WriteMessage(head); err != nil {
 		return err
 	}
-	
+
 	for hb := range hash.CalcFileSubHash(head, fileLen, in.File()) {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
-		
+
 		if err := rt.Rw.WriteMessage(hb); err != nil {
 			return errors.Wrap(err, "sendHashBuf")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -134,11 +171,11 @@ func (rt *ReceiveTransfer) receiveFileChunkIter(ctx context.Context) (matchIter 
 				yield(nil, errors.Wrapf(err, "readFileChunk"))
 				return
 			}
-			
+
 			if fileChunk.GetIsEnd() || !yield(&fileChunk, nil) {
 				return
 			}
-			
+
 			select {
 			case <-ctx.Done():
 				yield(nil, ctx.Err())
@@ -159,7 +196,7 @@ func (rt *ReceiveTransfer) TransferFile(ctx context.Context, targetPath string) 
 	if err != nil {
 		return errors.Wrap(err, "openFile")
 	}
-	
+
 	matchIter := rt.receiveFileChunkIter(ctx)
 	return match.SyncFile(ctx, matchIter, target)
 }

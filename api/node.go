@@ -2,7 +2,7 @@ package api
 
 import (
 	"net/http"
-	
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-puzzles/pgin"
 	"github.com/superwhys/remoteX/pkg/common"
@@ -15,7 +15,7 @@ func (a *RemoteXAPI) getAllNodes() gin.HandlerFunc {
 			pgin.ReturnError(c, http.StatusBadRequest, err.Error())
 			return
 		}
-		
+
 		pgin.ReturnSuccess(c, NodesToDto(nodes))
 	}
 }
@@ -30,6 +30,6 @@ func (a *RemoteXAPI) getNode(c *gin.Context, req *getNode) {
 		pgin.ReturnError(c, http.StatusNotFound, err.Error())
 		return
 	}
-	
+
 	pgin.ReturnSuccess(c, NodeToDto(node))
 }

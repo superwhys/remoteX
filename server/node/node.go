@@ -31,6 +31,9 @@ func NewNodeService(local *node.Node) *ServiceImpl {
 }
 
 func (ds *ServiceImpl) RegisterNode(n *node.Node) error {
+	ds.rl.Lock()
+	defer ds.rl.Unlock()
+
 	oldNode, _ := ds.nodes[n.NodeId]
 	if oldNode != nil && oldNode.CheckNodeOnline() {
 		return errorutils.ErrNode(n.NodeId, errorutils.WithMsg("Has a same online node"))
@@ -45,6 +48,9 @@ func (ds *ServiceImpl) RegisterNode(n *node.Node) error {
 }
 
 func (ds *ServiceImpl) GetNode(nodeId common.NodeID) (*node.Node, error) {
+	ds.rl.RLock()
+	defer ds.rl.RUnlock()
+
 	node, exists := ds.nodes[nodeId]
 	if !exists {
 		return nil, errorutils.ErrNodeNotFound(nodeId)
@@ -90,7 +96,10 @@ func (ds *ServiceImpl) RefreshCurrentNode() (*node.Node, error) {
 }
 
 func (ds *ServiceImpl) UpdateNode(n *node.Node) error {
-	n, ok := ds.nodes[n.NodeId]
+	ds.rl.Lock()
+	defer ds.rl.Unlock()
+
+	_, ok := ds.nodes[n.NodeId]
 	if !ok {
 		return errorutils.ErrNodeNotFound(n.NodeId)
 	}
@@ -100,6 +109,9 @@ func (ds *ServiceImpl) UpdateNode(n *node.Node) error {
 }
 
 func (ds *ServiceImpl) UpdateNodeStatus(nodeId common.NodeID, status node.NodeStatus) error {
+	ds.rl.Lock()
+	defer ds.rl.Unlock()
+
 	n, ok := ds.nodes[nodeId]
 	if !ok {
 		return errorutils.ErrNodeNotFound(nodeId)
@@ -112,6 +124,9 @@ func (ds *ServiceImpl) UpdateNodeStatus(nodeId common.NodeID, status node.NodeSt
 }
 
 func (ds *ServiceImpl) GetNodeStatus(nodeId common.NodeID) (node.NodeStatus, error) {
+	ds.rl.RLock()
+	defer ds.rl.RUnlock()
+
 	n, ok := ds.nodes[nodeId]
 	if !ok {
 		return node.NodeStatus(0), errorutils.ErrNodeNotFound(nodeId)
@@ -120,6 +135,9 @@ func (ds *ServiceImpl) GetNodeStatus(nodeId common.NodeID) (node.NodeStatus, err
 }
 
 func (ds *ServiceImpl) UpdateHeartbeat(nodeId common.NodeID) error {
+	ds.rl.Lock()
+	defer ds.rl.Unlock()
+
 	n, ok := ds.nodes[nodeId]
 	if !ok {
 		return errorutils.ErrNodeNotFound(nodeId)

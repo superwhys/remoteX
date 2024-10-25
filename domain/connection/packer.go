@@ -16,7 +16,7 @@ type packer interface {
 
 var (
 	packers = []packer{
-		&TrackerStream{},
+		// &TrackerStream{},
 		&LimiterStream{},
 		&CounterStream{},
 	}

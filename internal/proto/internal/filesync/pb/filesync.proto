@@ -66,9 +66,15 @@ message syncFile {
 	filesystem.EntryType type = 3;
 }
 
+message errorFile {
+	string name = 1;
+	string message = 2;
+}
+
 message SyncResp {
 	int64 total = 1;
 	int64 total_size = 2 [(ext.json) = "total_size"];
 	int64 actual_send_bytes = 3 [(ext.json) = "actual_send_bytes"];
 	repeated syncFile files = 4 [(ext.nullable) = true];
+	repeated errorFile error_files = 5 [(ext.nullable) = true, (ext.json) = "error_files,omitempty"];
 }

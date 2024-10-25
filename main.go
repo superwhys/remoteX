@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	
+
 	"github.com/go-puzzles/puzzles/cores"
 	httppuzzle "github.com/go-puzzles/puzzles/cores/puzzles/http-puzzle"
 	"github.com/go-puzzles/puzzles/pflags"
@@ -21,16 +21,16 @@ var (
 func main() {
 	pflags.SetStructParseTagName("yaml")
 	pflags.Parse()
-	
+
 	conf := new(config.Config)
 	plog.PanicError(configFlag(conf))
-	
+
 	opt, err := server.InitOption(conf)
 	plog.PanicError(err)
-	
+
 	remoteXServer := server.NewRemoteXServer(opt)
 	remoteXApi := api.NewRemoteXAPI(remoteXServer)
-	
+
 	core := cores.NewPuzzleCore(
 		httppuzzle.WithCoreHttpPuzzle("/api", remoteXApi.SetupHttpServer()),
 		cores.WithDaemonNameWorker("RemoteX", func(ctx context.Context) error {
@@ -39,6 +39,6 @@ func main() {
 			return mainService.Serve(ctx)
 		}),
 	)
-	
+
 	plog.PanicError(cores.Start(core, port()))
 }

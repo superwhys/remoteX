@@ -2,6 +2,7 @@ package sender
 
 import (
 	"context"
+	"io"
 	"io/fs"
 	"iter"
 	"path/filepath"
@@ -96,8 +97,15 @@ func (st *SendTransfer) ReceiveHeadSum(ctx context.Context) (*pb.HashHead, error
 	return &head, nil
 }
 
-func (st *SendTransfer) SendFile(ctx context.Context, fileSize int64, srcPath string) error {
+func (st *SendTransfer) SendFile(ctx context.Context, fileSize int64, srcPath string) (err error) {
 	plog.Debugf("start send whole file: %v", srcPath)
+	defer func() {
+		if err != nil {
+			plog.Errorf("send whole file has error: %v", err)
+			st.Rw.WriteMessage(&pb.FileChunk{IsEnd: true})
+		}
+	}()
+
 	srcFile, err := filesystem.BasicFs.OpenFile(srcPath)
 	if err != nil {
 		return errors.Wrapf(err, "open file: %s", srcPath)
@@ -105,10 +113,10 @@ func (st *SendTransfer) SendFile(ctx context.Context, fileSize int64, srcPath st
 	defer srcFile.Close()
 
 	var (
-		offset      int64
 		blockLength int64 = 256 * 1024
-		l                 = blockLength
 	)
+
+	buf := make([]byte, blockLength)
 	for {
 		select {
 		case <-ctx.Done():
@@ -116,32 +124,35 @@ func (st *SendTransfer) SendFile(ctx context.Context, fileSize int64, srcPath st
 		default:
 		}
 
-		if offset+blockLength > fileSize {
-			l = fileSize - offset
-		}
-
-		b, err := filesystem.BasicFs.ReadFileAtOffset(srcFile, offset, l)
+		n, err := srcFile.Read(buf)
 		if err != nil {
-			return errors.Wrapf(err, "read file at offset: %d", offset)
+			if err == io.EOF {
+				break
+			}
+			return err
 		}
+		chunk := buf[:n]
 
-		if err := st.Rw.WriteMessage(&pb.FileChunk{Data: b}); err != nil {
+		if err := st.Rw.WriteMessage(&pb.FileChunk{Data: chunk}); err != nil {
 			return errors.Wrapf(err, "write match chunk: %s", srcPath)
 		}
 
-		st.ActualSend += len(b)
-
-		offset += blockLength
-		if offset >= fileSize {
-			break
-		}
+		st.ActualSend += len(chunk)
+		plog.Debugf("send %d bytes, total %d bytes", len(chunk), st.ActualSend)
 	}
 
-	plog.Debugf("send whole file: %v done", srcPath)
 	return st.Rw.WriteMessage(&pb.FileChunk{IsEnd: true})
 }
 
-func (st *SendTransfer) HashMatch(ctx context.Context, head *pb.HashHead, srcPath string) error {
+func (st *SendTransfer) HashMatch(ctx context.Context, head *pb.HashHead, srcPath string) (err error) {
+	plog.Debugf("start send chunk file: %v", srcPath)
+	defer func() {
+		if err != nil {
+			plog.Errorf("send hash match file has error: %v", err)
+			st.Rw.WriteMessage(&pb.FileChunk{IsEnd: true})
+		}
+	}()
+
 	srcFile, err := filesystem.BasicFs.OpenFile(srcPath)
 	if err != nil {
 		return errors.Wrapf(err, "open file: %s", srcPath)

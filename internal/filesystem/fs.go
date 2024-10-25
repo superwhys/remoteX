@@ -58,11 +58,18 @@ func (f *BasicFileSystem) List(path string) (entries []*Entry, err error) {
 			return nil, err
 		}
 
+		path := filepath.Join(path, de.Name())
+
+		isDir, err := f.checkWheatherDir(path, info)
+		if err != nil {
+			return nil, err
+		}
+
 		entry := &Entry{
 			Name:         de.Name(),
-			Path:         filepath.Join(path, de.Name()),
+			Path:         path,
 			Size:         info.Size(),
-			Type:         GetEntryType(de.IsDir()),
+			Type:         GetEntryType(isDir),
 			CreatedTime:  info.ModTime().Format(time.DateTime),
 			ModifiedTime: info.ModTime().Format(time.DateTime),
 			AccessedTime: info.ModTime().Format(time.DateTime),
@@ -87,6 +94,33 @@ func (f *BasicFileSystem) Walk(path string, filter WalkFilter) (entries []*Entry
 	}
 
 	return
+}
+
+func (f *BasicFileSystem) checkWheatherDir(path string, info fs.FileInfo) (bool, error) {
+	fileInfo, err := os.Lstat(path)
+	if err != nil {
+		return false, err
+	}
+
+	if fileInfo.Mode()&os.ModeSymlink == 0 {
+		return info.IsDir(), nil
+	}
+
+	targetPath, err := os.Readlink(path)
+	if err != nil {
+		return false, err
+	}
+
+	if !filepath.IsAbs(targetPath) {
+		targetPath = filepath.Join(filepath.Dir(path), targetPath)
+	}
+
+	targetInfo, err := os.Stat(targetPath)
+	if err != nil {
+		return false, err
+	}
+
+	return targetInfo.IsDir(), nil
 }
 
 func (f *BasicFileSystem) WalkIter(root string, filter WalkFilter) (iter.Seq[*Entry], error) {
@@ -114,9 +148,14 @@ func (f *BasicFileSystem) WalkIter(root string, filter WalkFilter) (iter.Seq[*En
 				return nil
 			}
 
+			isDir, err := f.checkWheatherDir(path, info)
+			if err != nil {
+				return err
+			}
+
 			entry := &Entry{
 				Name:         info.Name(),
-				Type:         GetEntryType(info.IsDir()),
+				Type:         GetEntryType(isDir),
 				Size:         info.Size(),
 				Path:         path,
 				Wpath:        strings.TrimPrefix(path, strip),
@@ -143,7 +182,8 @@ func (f *BasicFileSystem) WalkIter(root string, filter WalkFilter) (iter.Seq[*En
 }
 
 func (f *BasicFileSystem) OpenFile(path string) (*File, error) {
-	file, err := os.Open(path)
+	file, err := os.OpenFile(path, os.O_RDONLY, 0666)
+	// file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}

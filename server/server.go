@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"time"
-	
+
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/auth"
@@ -17,7 +17,7 @@ import (
 	"github.com/superwhys/remoteX/pkg/tracker"
 	"github.com/thejerf/suture/v4"
 	"golang.org/x/sync/errgroup"
-	
+
 	authSrv "github.com/superwhys/remoteX/server/auth"
 	commandSrv "github.com/superwhys/remoteX/server/command"
 	connSrv "github.com/superwhys/remoteX/server/connection"
@@ -26,16 +26,16 @@ import (
 
 type RemoteXServer struct {
 	*suture.Supervisor
-	
+
 	NodeService    node.Service
 	ConnService    connection.Service
 	AuthService    auth.Service
 	CommandService command.Service
-	
+
 	opt               *Option
 	packOpts          *connection.PackOpts
 	heartbeatInterval time.Duration
-	
+
 	dialTasks chan *connection.DialTask
 	// connections It is a channel used for transmitting successfully established connections
 	// (including listening connections and self created connections)
@@ -48,7 +48,7 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 	server := &RemoteXServer{
 		opt:        opt,
 		Supervisor: suture.NewSimple("RemoteX.Service"),
-		
+
 		NodeService:       nodeSrv.NewNodeService(local),
 		AuthService:       authSrv.NewSimpleAuthService(),
 		ConnService:       connSrv.NewConnectionService(local.URL(), opt.TlsConfig),
@@ -61,14 +61,14 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 		dialTasks:   make(chan *connection.DialTask),
 		connections: make(chan connection.TlsConn),
 	}
-	
+
 	listener.InitListener()
 	dialer.InitDialer()
-	
+
 	server.Add(svcutils.AsService(server.startDialer, "startDialer"))
 	server.Add(svcutils.AsService(server.startListener, "startListener"))
 	server.Add(svcutils.AsService(server.handleConnection, "handleConnection"))
-	
+
 	return server
 }
 
@@ -80,7 +80,7 @@ func (s *RemoteXServer) startDialer(ctx context.Context) error {
 			}
 		}
 	}()
-	
+
 	for {
 		var task *connection.DialTask
 		select {
@@ -89,13 +89,13 @@ func (s *RemoteXServer) startDialer(ctx context.Context) error {
 			return ctx.Err()
 		case task = <-s.dialTasks:
 		}
-		
+
 		// if dial task is redial task
 		// update the node status to Connecting
 		if task.IsRedial && task.NodeId != "" {
 			_ = s.NodeService.UpdateNodeStatus(task.NodeId, node.NodeStatusConnecting)
 		}
-		
+
 		conn, err := s.ConnService.EstablishConnection(ctx, task.Target)
 		if err != nil {
 			if !task.IsRedial {
@@ -105,7 +105,7 @@ func (s *RemoteXServer) startDialer(ctx context.Context) error {
 			s.connectionRedial(task.NodeId, task.Target)
 			continue
 		}
-		
+
 		s.connections <- conn
 	}
 }
@@ -123,17 +123,16 @@ func (s *RemoteXServer) handleConnection(ctx context.Context) error {
 		if n != nil {
 			err = s.NodeService.UpdateNode(remote)
 		} else {
-			err = s.registerNode(remote)
+			err = s.NodeService.RegisterNode(remote)
 		}
 		if err != nil {
 			plog.Errorf("update/register remote node: %v error: %v", remote, err)
 			conn.Close()
 			continue
 		}
-		
-		s.registerConnection(conn)
+		s.ConnService.RegisterConnection(conn)
 		plog.Infof("register connection: %v. NodeId: %v", conn.GetConnectionId(), conn.GetNodeId())
-		
+
 		go s.background(ctx, conn)
 	}
 	return nil
@@ -141,13 +140,13 @@ func (s *RemoteXServer) handleConnection(ctx context.Context) error {
 
 func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn) {
 	eg, ctx := errgroup.WithContext(ctx)
-	
+
 	hbStartNotify := make(chan struct{})
-	
+
 	eg.Go(func() error {
 		return s.schedulerHeartbeat(ctx, conn, hbStartNotify)
 	})
-	
+
 	// must be called after heartbeat is start
 	eg.Go(func() error {
 		select {
@@ -158,14 +157,10 @@ func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn)
 			return s.schedulerCommand(ctx, conn)
 		}
 	})
-	
+
 	if err := eg.Wait(); err != nil {
 		plog.Errorf("failed to run background connection: %v", err)
 		_ = s.NodeService.UpdateNodeStatus(conn.GetNodeId(), node.NodeStatusOffline)
 		s.CloseConnection(conn)
 	}
-}
-
-func (s *RemoteXServer) registerNode(n *node.Node) error {
-	return s.NodeService.RegisterNode(n)
 }
