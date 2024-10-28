@@ -5,13 +5,14 @@ go 1.23.2
 require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-puzzles/pgin v1.0.9
-	github.com/go-puzzles/puzzles v1.0.17
+	github.com/go-puzzles/puzzles v1.0.20
 	github.com/gogo/protobuf v1.3.2
 	github.com/pkg/errors v0.9.1
 	github.com/quic-go/quic-go v0.47.0
 	github.com/stretchr/testify v1.9.0
 	github.com/thejerf/suture/v4 v4.0.5
 	github.com/xtaci/smux v1.5.30
+	go.uber.org/atomic v1.9.0
 	golang.org/x/net v0.29.0
 	golang.org/x/sync v0.8.0
 	golang.org/x/time v0.6.0
@@ -78,7 +79,6 @@ require (
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/arch v0.10.0 // indirect

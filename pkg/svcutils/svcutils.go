@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	
-	"github.com/go-puzzles/puzzles/plog"
+
 	"github.com/pkg/errors"
 	"github.com/thejerf/suture/v4"
 )
@@ -37,13 +36,13 @@ func (s *service) Serve(ctx context.Context) error {
 	s.mut.Lock()
 	s.err = nil
 	s.mut.Unlock()
-	
+
 	err := waitContext(ctx, s.serve(ctx))
-	
+
 	s.mut.Lock()
 	s.err = err
 	s.mut.Unlock()
-	
+
 	return err
 }
 
@@ -60,7 +59,6 @@ func (s *service) String() string {
 func waitContext(ctx context.Context, err error) error {
 	select {
 	case <-ctx.Done():
-		plog.Errorf("waitContext done")
 		return ctx.Err()
 	default:
 	}

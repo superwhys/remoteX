@@ -158,7 +158,7 @@ func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn)
 		}
 	})
 
-	if err := eg.Wait(); err != nil {
+	if err := eg.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		plog.Errorf("failed to run background connection: %v", err)
 		_ = s.NodeService.UpdateNodeStatus(conn.GetNodeId(), node.NodeStatusOffline)
 		s.CloseConnection(conn)
