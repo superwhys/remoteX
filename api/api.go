@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/go-puzzles/pgin"
+	"github.com/go-puzzles/puzzles/pgin"
 	"github.com/superwhys/remoteX/server"
 )
 

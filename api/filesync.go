@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-puzzles/pgin"
+	"github.com/go-puzzles/puzzles/pgin"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/domain/connection"

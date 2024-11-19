@@ -4,13 +4,15 @@ import (
 	"context"
 
 	"github.com/go-puzzles/puzzles/cores"
-	httppuzzle "github.com/go-puzzles/puzzles/cores/puzzles/http-puzzle"
 	"github.com/go-puzzles/puzzles/pflags"
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/superwhys/remoteX/api"
 	"github.com/superwhys/remoteX/config"
 	"github.com/superwhys/remoteX/server"
 	"github.com/thejerf/suture/v4"
+
+	httppuzzle "github.com/go-puzzles/puzzles/cores/puzzles/http-puzzle"
+	pprofpuzzle "github.com/go-puzzles/puzzles/cores/puzzles/pprof-puzzle"
 )
 
 var (
@@ -32,6 +34,7 @@ func main() {
 	remoteXApi := api.NewRemoteXAPI(remoteXServer)
 
 	core := cores.NewPuzzleCore(
+		pprofpuzzle.WithCorePprof(),
 		httppuzzle.WithCoreHttpPuzzle("/api", remoteXApi.SetupHttpServer()),
 		cores.WithDaemonNameWorker("RemoteX", func(ctx context.Context) error {
 			mainService := suture.NewSimple("main")

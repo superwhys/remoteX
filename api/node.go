@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-puzzles/pgin"
+	"github.com/go-puzzles/puzzles/pgin"
 	"github.com/superwhys/remoteX/pkg/common"
 )
 
