@@ -9,6 +9,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/quic-go/quic-go v0.47.0
 	github.com/stretchr/testify v1.9.0
+	github.com/superwhys/sshtunnel v1.0.5
 	github.com/thejerf/suture/v4 v4.0.5
 	github.com/xtaci/smux v1.5.30
 	go.uber.org/atomic v1.9.0
@@ -55,6 +56,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rs/cors v1.11.0 // indirect
 	github.com/sagikazarmark/locafero v0.6.0 // indirect
+	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect

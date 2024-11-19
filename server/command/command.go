@@ -11,7 +11,9 @@ import (
 	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 	"github.com/superwhys/remoteX/server/command/filesystem"
+	"github.com/superwhys/remoteX/server/command/screenshot"
 	"github.com/superwhys/remoteX/server/command/sync"
+	"github.com/superwhys/remoteX/server/command/tunnel"
 )
 
 type strategyHandler func(ctx context.Context, args command.Args, rw protoutils.ProtoMessageReadWriter) (proto.Message, error)
@@ -27,11 +29,16 @@ func NewCommandService() command.Service {
 
 	fsSrv := filesystem.NewFilesystemService()
 	syncSrv := sync.NewSyncService()
+	screenshotSrv := screenshot.NewScreenshotService()
+	tunnelSrv := tunnel.NewTunnelService()
 
 	s.registerStrategy(command.Empty, s.doEmpty)
 	s.registerStrategy(command.Listdir, fsSrv.ListDir)
 	s.registerStrategy(command.Push, syncSrv.Push)
 	s.registerStrategy(command.Pull, syncSrv.Pull)
+	s.registerStrategy(command.Screenshot, screenshotSrv.Screenshot)
+	s.registerStrategy(command.Forward, tunnelSrv.Forward)
+	s.registerStrategy(command.Reverse, tunnelSrv.Reverse)
 
 	return s
 }

@@ -12,6 +12,9 @@ enum CommandType {
   	ListDir = 1;
   	Push = 2;
   	Pull = 3; 
+	Screenshot = 4;
+	Forward = 5;
+	Reverse = 6;
 }
 
 message Command {
