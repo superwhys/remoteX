@@ -72,7 +72,7 @@ func (c *TcpConnection) SetWriteDeadline(t time.Time) error {
 }
 
 func (c *TcpConnection) AcceptStream() (connection.Stream, error) {
-	s, err := c.session.AcceptStream()
+	stream, err := c.session.AcceptStream()
 	if err != nil {
 		opErr := new(net.OpError)
 		if errors.As(err, &opErr) && !opErr.Timeout() {
@@ -81,16 +81,22 @@ func (c *TcpConnection) AcceptStream() (connection.Stream, error) {
 		return nil, errors.Wrap(err, "acceptStream")
 	}
 
-	return NewTcpStream(c.connId, s), nil
+	s := NewTcpStream(c.connId, stream)
+	s = connection.PackStream(s)
+
+	return s, nil
 }
 
 func (c *TcpConnection) OpenStream() (connection.Stream, error) {
-	s, err := c.session.OpenStream()
+	stream, err := c.session.OpenStream()
 	if err != nil {
 		return nil, err
 	}
 
-	return NewTcpStream(c.connId, s), nil
+	s := NewTcpStream(c.connId, stream)
+	s = connection.PackStream(s)
+
+	return s, nil
 }
 
 func (c *TcpConnection) Close() error {
@@ -110,7 +116,7 @@ type TcpStream struct {
 	connectionId string
 }
 
-func NewTcpStream(connId string, stream *smux.Stream) *TcpStream {
+func NewTcpStream(connId string, stream *smux.Stream) connection.Stream {
 	return &TcpStream{
 		Stream: stream,
 		StreamReadWriter: &StreamReadWriter{

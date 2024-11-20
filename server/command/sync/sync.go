@@ -13,12 +13,13 @@ import (
 	"fmt"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/domain/command/sync"
+	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/internal/filesync"
 	"github.com/superwhys/remoteX/internal/filesync/pb"
 	"github.com/superwhys/remoteX/pkg/errorutils"
-	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
 var _ sync.Service = (*ServiceImpl)(nil)
@@ -30,23 +31,9 @@ func NewSyncService() *ServiceImpl {
 	return &ServiceImpl{}
 }
 
-type argsSliceError []error
-
-func (a argsSliceError) Error() string {
-	if len(a) == 0 {
-		return "no error"
-	}
-
-	s := ""
-	for _, e := range a {
-		s += e.Error() + "\n"
-	}
-	return s
-}
-
 func (s *ServiceImpl) ParseArgs(args command.Args) (opts *pb.SyncOpts, err error) {
 	opts = opts.SetDefault()
-	var se argsSliceError
+	var ea errorutils.ErrorArr
 
 	for key, val := range args {
 		switch key {
@@ -59,18 +46,42 @@ func (s *ServiceImpl) ParseArgs(args command.Args) (opts *pb.SyncOpts, err error
 		case "whole":
 			opts.Whole = val.GetBoolValue()
 		default:
-			se = append(se, fmt.Errorf("error argument: %v", key))
+			ea = append(ea, fmt.Errorf("error argument: %v", key))
 		}
 	}
 
-	if len(se) == 0 {
+	if len(ea) == 0 {
 		return opts, nil
 	}
 
-	return nil, se
+	return nil, ea
 }
 
-func (s *ServiceImpl) Push(ctx context.Context, args command.Args, rw protoutils.ProtoMessageReadWriter) (proto.Message, error) {
+func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, opt *command.RemoteOpt) (proto.Message, error) {
+	switch cmd.Type {
+	case command.Push:
+		return s.Push(ctx, cmd.Args, opt)
+	case command.Pull:
+		return s.Pull(ctx, cmd.Args, opt)
+	default:
+		return nil, errorutils.ErrNotSupportCommandType(int32(cmd.Type))
+	}
+}
+
+func (s *ServiceImpl) tellRemote(remoteType command.CommandType, currentArgs command.Args, stream connection.Stream) error {
+	remoteCmd := &command.Command{
+		Type: remoteType,
+		Args: currentArgs,
+	}
+
+	if err := stream.WriteMessage(remoteCmd); err != nil {
+		return errors.Wrap(err, "sendCommand")
+	}
+
+	return nil
+}
+
+func (s *ServiceImpl) Push(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error) {
 	opts, err := s.ParseArgs(args)
 	if err != nil {
 		return nil, err
@@ -78,7 +89,18 @@ func (s *ServiceImpl) Push(ctx context.Context, args command.Args, rw protoutils
 	if opts.Path == "" {
 		return nil, errorutils.ErrCommandMissingArguments(int32(command.Push), args)
 	}
-	resp, err := filesync.SendFiles(ctx, rw, opts.Path, opts)
+
+	stream, err := opt.Conn.OpenStream()
+	if err != nil {
+		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
+	}
+
+	err = s.tellRemote(command.Pull, args, stream)
+	if err != nil {
+		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
+	}
+
+	resp, err := filesync.SendFiles(ctx, stream, opts.Path, opts)
 	if err != nil {
 		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
 	}
@@ -86,7 +108,7 @@ func (s *ServiceImpl) Push(ctx context.Context, args command.Args, rw protoutils
 	return resp, nil
 }
 
-func (s *ServiceImpl) Pull(ctx context.Context, args command.Args, rw protoutils.ProtoMessageReadWriter) (proto.Message, error) {
+func (s *ServiceImpl) Pull(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error) {
 	opts, err := s.ParseArgs(args)
 	if err != nil {
 		return nil, err
@@ -94,7 +116,18 @@ func (s *ServiceImpl) Pull(ctx context.Context, args command.Args, rw protoutils
 	if opts.Dest == "" {
 		return nil, errorutils.ErrCommandMissingArguments(int32(command.Pull), args)
 	}
-	if err := filesync.ReceiveFile(ctx, rw, opts.Dest, opts); err != nil {
+
+	stream, err := opt.Conn.OpenStream()
+	if err != nil {
+		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
+	}
+
+	err = s.tellRemote(command.Push, args, stream)
+	if err != nil {
+		return nil, errorutils.ErrCommand(int32(command.Pull), args, errorutils.WithError(err))
+	}
+
+	if err := filesync.ReceiveFile(ctx, stream, opts.Dest, opts); err != nil {
 		return nil, errorutils.ErrCommand(int32(command.Pull), args, errorutils.WithError(err))
 	}
 

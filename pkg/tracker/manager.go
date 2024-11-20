@@ -31,13 +31,15 @@ type Manager struct {
 	*trafficInfo
 }
 
-func CreateTrackerManager() *Manager {
-	m := &Manager{
+var (
+	Trackermanager *Manager
+)
+
+func InitTrackerManager() {
+	Trackermanager = &Manager{
 		trafficInfo: initTraffic(),
 	}
-	go m.handleTrafficCalc()
-
-	return m
+	go Trackermanager.handleTrafficCalc()
 }
 
 func (m *Manager) PushUploaded(size int64) {

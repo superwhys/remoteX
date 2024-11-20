@@ -13,10 +13,10 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/superwhys/remoteX/domain/command"
-	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
 type Service interface {
-	Push(ctx context.Context, args command.Args, rw protoutils.ProtoMessageReadWriter) (proto.Message, error)
-	Pull(ctx context.Context, args command.Args, rw protoutils.ProtoMessageReadWriter) (proto.Message, error)
+	command.CommandProvider
+	Push(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error)
+	Pull(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error)
 }

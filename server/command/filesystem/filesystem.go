@@ -7,7 +7,6 @@ import (
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/internal/filesystem"
 	"github.com/superwhys/remoteX/pkg/errorutils"
-	"github.com/superwhys/remoteX/pkg/protoutils"
 
 	fsDomain "github.com/superwhys/remoteX/domain/command/filesystem"
 )
@@ -22,7 +21,16 @@ func NewFilesystemService() fsDomain.Service {
 	}
 }
 
-func (s *ServiceImpl) ListDir(_ context.Context, args command.Args, _ protoutils.ProtoMessageReadWriter) (proto.Message, error) {
+func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, opt *command.RemoteOpt) (proto.Message, error) {
+	switch cmd.Type {
+	case command.Listdir:
+		return s.ListDir(ctx, cmd.GetArgs(), nil)
+	default:
+		return nil, errorutils.ErrNotSupportCommandType(int32(cmd.Type))
+	}
+}
+
+func (s *ServiceImpl) ListDir(_ context.Context, args command.Args, _ *command.RemoteOpt) (proto.Message, error) {
 	path, exists := args["path"]
 	if !exists {
 		return nil, errorutils.ErrCommandMissingArguments(int32(command.Listdir), args)

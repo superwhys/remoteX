@@ -6,8 +6,9 @@
 - [x] List remote node dir 
 - [x] Adapt to UDP, Quic
 - [x] Add file sync(upload, download)
+- [x] Tunnel Forward
+- [x] Tunnel Reverse
 - [ ] Screenshot
-- [ ] Reverse Shell
 - [ ] Run Command
 
 ## Message Body

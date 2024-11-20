@@ -1,110 +1,188 @@
-// File:		tunnel.go
-// Created by:	Hoven
-// Created on:	2024-11-19
-//
-// This file is part of the Example Project.
-//
-// (c) 2024 Example Corp. All rights reserved.
-
 package tunnel
 
 import (
 	"context"
-	"embed"
-	"encoding/base64"
 	"fmt"
+	"io"
+	"net"
 	"sync"
 
+	"github.com/go-puzzles/puzzles/plog"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/superwhys/sshtunnel"
+	"github.com/superwhys/remoteX/domain/command"
+	"github.com/superwhys/remoteX/domain/connection"
+	"golang.org/x/sync/errgroup"
 )
 
-type SshConfig struct {
-	HostName string
-	User     string
+type Tunnel struct {
+	TunnelKey  string
+	LocalAddr  string
+	RemoteAddr string
+	listener   net.Listener
+	conn       connection.StreamConnection
 }
 
-type tunnel struct {
-	cancel func()
-	t      *sshtunnel.SshTunnel
-}
-
-type SshTunnel struct {
-	lock         sync.RWMutex
-	sshConfig    *SshConfig
-	identityFile *embed.FS
-	manager      map[string]*tunnel
-}
-
-func NewSshTunnel(sshConfig *SshConfig, identityFile *embed.FS) *SshTunnel {
-	return &SshTunnel{sshConfig: sshConfig, identityFile: identityFile}
-}
-
-func (t *SshTunnel) registerTunnel(key string, st *sshtunnel.SshTunnel, cancel func()) {
-	t.lock.Lock()
-	t.manager[key] = &tunnel{t: st, cancel: cancel}
-	t.lock.Unlock()
-}
-
-func (t *SshTunnel) CloseTunnel(key string) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	if tunnel, ok := t.manager[key]; ok {
-		tunnel.cancel()
-		tunnel.t.Close()
-		delete(t.manager, key)
-	} else {
-		return
+func (t *Tunnel) Close() error {
+	if t.listener != nil {
+		t.listener.Close()
 	}
-}
-
-type doFunc func(ctx context.Context, localAddr, remoteAddr string) error
-
-func (t *SshTunnel) doTunnel(ctx context.Context, tunnel *sshtunnel.SshTunnel, key string, localAddr, remoteAddr string, fn doFunc) error {
-	t.lock.RLock()
-	if _, exists := t.manager[key]; exists {
-		t.lock.RUnlock()
-		return errors.New("tunnel already exists")
+	if t.conn != nil {
+		t.conn.Close()
 	}
-	t.lock.RUnlock()
-
-	ctx, cancel := context.WithCancel(ctx)
-	if err := fn(ctx, localAddr, remoteAddr); err != nil {
-		return errors.Wrap(err, "doTunnel")
-	}
-
-	t.registerTunnel(key, tunnel, cancel)
 	return nil
 }
 
-func (t *SshTunnel) Forward(ctx context.Context, localAddr, remoteAddr string) (string, error) {
-	key := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("forward:%s->%s", localAddr, remoteAddr)))
-
-	tunnel := sshtunnel.NewTunnelWithEmbed(t.identityFile, &sshtunnel.SshConfig{
-		User:     t.sshConfig.User,
-		HostName: t.sshConfig.HostName,
-	})
-
-	if err := t.doTunnel(ctx, tunnel, key, localAddr, remoteAddr, tunnel.Forward); err != nil {
-		return "", errors.Wrap(err, "forward tunnel")
-	}
-
-	return key, nil
+type TunnelManager struct {
+	tunnels map[string]*Tunnel
+	mu      sync.RWMutex
 }
 
-func (t *SshTunnel) Reverse(ctx context.Context, localAddr, remoteAddr string) (string, error) {
-	key := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("reverse:%s->%s", localAddr, remoteAddr)))
+func NewTunnelManager() *TunnelManager {
+	return &TunnelManager{
+		tunnels: make(map[string]*Tunnel),
+	}
+}
 
-	tunnel := sshtunnel.NewTunnelWithEmbed(t.identityFile, &sshtunnel.SshConfig{
-		User:     t.sshConfig.User,
-		HostName: t.sshConfig.HostName,
-	})
-
-	if err := t.doTunnel(ctx, tunnel, key, localAddr, remoteAddr, tunnel.Reverse); err != nil {
-		return "", errors.Wrap(err, "forward tunnel")
+func (m *TunnelManager) CreateTunnel(ctx context.Context, localAddr, remoteAddr string, conn connection.StreamConnection) (*Tunnel, error) {
+	listener, err := net.Listen("tcp", localAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen on %s: %v", localAddr, err)
 	}
 
-	return key, nil
+	tunnel := &Tunnel{
+		TunnelKey:  uuid.New().String(),
+		LocalAddr:  localAddr,
+		RemoteAddr: remoteAddr,
+		listener:   listener,
+		conn:       conn,
+	}
 
+	m.mu.Lock()
+	m.tunnels[tunnel.TunnelKey] = tunnel
+	m.mu.Unlock()
+
+	go m.handleTunnel(ctx, tunnel)
+
+	return tunnel, nil
+}
+
+func (m *TunnelManager) handleTunnel(ctx context.Context, tunnel *Tunnel) {
+	defer func() {
+		m.CloseTunnel(tunnel.TunnelKey)
+		plog.Debugc(ctx, "tunnel close")
+	}()
+
+	for {
+		localConn, err := tunnel.listener.Accept()
+		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Temporary() {
+				continue
+			}
+			plog.Errorc(ctx, "Failed to accept connection: %v", err)
+			return
+		}
+
+		stream, err := m.remoteEstablish(tunnel)
+		if err != nil {
+			plog.Errorc(ctx, "Failed to establish connection: %v", err)
+			continue
+		}
+
+		plog.Debugc(ctx, "establish remote connection success, start exchange data")
+
+		go func(conn net.Conn) {
+			defer conn.Close()
+			defer stream.Close()
+
+			if err := m.exchange(ctx, stream, conn); err != nil {
+				plog.Errorc(ctx, "Failed to exchange data: %v", err)
+			}
+		}(localConn)
+	}
+}
+
+func (m *TunnelManager) remoteEstablish(tunnel *Tunnel) (connection.Stream, error) {
+	tc := &command.TunnelConnect{
+		TunnelKey: tunnel.TunnelKey,
+		Addr:      tunnel.RemoteAddr,
+	}
+
+	stream, err := tunnel.conn.OpenStream()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := stream.WriteMessage(tc.ToCommand(command.Forwardreceive)); err != nil {
+		return nil, errors.Wrap(err, "send forwardreceive command")
+	}
+
+	resp := &command.TunnelConnectResp{}
+	if err := stream.ReadMessage(resp); err != nil {
+		return nil, errors.Wrap(err, "read remote forwardreceive command resp")
+	}
+
+	if !resp.Success {
+		return nil, errors.New("remote establish not success")
+	}
+
+	return stream, nil
+}
+
+func (m *TunnelManager) ReceiveTunnel(ctx context.Context, tunnelKey, targetAddr string, stream connection.Stream) error {
+	targetConn, err := net.Dial("tcp", targetAddr)
+	if err != nil {
+		return stream.WriteMessage(&command.TunnelConnectResp{
+			TunnelKey: tunnelKey,
+			Success:   false,
+			Error:     err.Error(),
+		})
+	}
+	defer targetConn.Close()
+
+	if err := stream.WriteMessage(&command.TunnelConnectResp{
+		TunnelKey: tunnelKey,
+		Success:   true,
+	}); err != nil {
+		return err
+	}
+
+	return m.exchange(ctx, stream, targetConn)
+}
+
+func (m *TunnelManager) ListTunnels() []*Tunnel {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	tunnels := make([]*Tunnel, 0, len(m.tunnels))
+	for _, tunnel := range m.tunnels {
+		tunnels = append(tunnels, tunnel)
+	}
+	return tunnels
+}
+
+func (m *TunnelManager) CloseTunnel(tunnelKey string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if tunnel, exists := m.tunnels[tunnelKey]; exists {
+		tunnel.Close()
+		delete(m.tunnels, tunnelKey)
+	}
+}
+
+func (m *TunnelManager) exchange(ctx context.Context, dst, src io.ReadWriter) error {
+	eg, ctx := errgroup.WithContext(ctx)
+
+	eg.Go(func() error {
+		_, err := io.Copy(dst, src)
+		return err
+	})
+
+	eg.Go(func() error {
+		_, err := io.Copy(src, dst)
+		return err
+	})
+
+	return eg.Wait()
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/pkg/common"
 	"github.com/superwhys/remoteX/pkg/errorutils"
-	"golang.org/x/sync/errgroup"
 )
 
 func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.TlsConn) error {
@@ -32,8 +31,6 @@ func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.Tl
 			}
 
 			go func(stream connection.Stream) {
-				// pack tracker, limiter and counter
-				stream = connection.PackStream(stream, s.packOpts)
 				if err := s.receiveAndHandleCommand(ctx, stream); err != nil {
 					plog.Errorf("handle command error: %v", err)
 				}
@@ -51,7 +48,7 @@ func (s *RemoteXServer) receiveAndHandleCommand(ctx context.Context, stream conn
 
 	plog.Debugf("received command: %v", cmd)
 
-	resp, err := s.HandleCommand(ctx, cmd, stream)
+	resp, err := s.CommandService.DoAcceptCommand(ctx, cmd, stream)
 	if err != nil {
 		return stream.WriteMessage(&command.Ret{ErrMsg: fmt.Sprintf("handle command failed: %v", err)})
 	}
@@ -59,13 +56,11 @@ func (s *RemoteXServer) receiveAndHandleCommand(ctx context.Context, stream conn
 	return stream.WriteMessage(resp)
 }
 
-func (s *RemoteXServer) HandleCommand(ctx context.Context, cmd *command.Command, stream connection.Stream) (*command.Ret, error) {
-	return s.CommandService.DoCommand(ctx, cmd, stream)
+func (s *RemoteXServer) HandleLocalCommand(ctx context.Context, cmd *command.Command) (resp *command.Ret, err error) {
+	return s.CommandService.DoLocalCommand(ctx, cmd)
 }
 
-type callbackFn func(ctx context.Context, stream connection.Stream) error
-
-func (s *RemoteXServer) HandleRemoteCommand(ctx context.Context, nodeId common.NodeID, cmd *command.Command, callback callbackFn) (resp *command.Ret, err error) {
+func (s *RemoteXServer) SendCommandToRemote(ctx context.Context, nodeId common.NodeID, cmd *command.Command) (resp *command.Ret, err error) {
 	remoteNode, err := s.NodeService.GetNode(nodeId)
 	if err != nil {
 		return nil, errors.Wrap(err, "getNode")
@@ -84,25 +79,8 @@ func (s *RemoteXServer) HandleRemoteCommand(ctx context.Context, nodeId common.N
 	}
 	defer stream.Close()
 
-	stream = connection.PackStream(stream, s.packOpts)
-	return s.handleRemoteStream(ctx, stream, cmd, callback)
-}
-
-func (s *RemoteXServer) handleRemoteStream(ctx context.Context, stream connection.Stream, cmd *command.Command, callback callbackFn) (resp *command.Ret, err error) {
-	eg, ctx := errgroup.WithContext(ctx)
-
 	if err := stream.WriteMessage(cmd); err != nil {
 		return nil, errors.Wrap(err, "sendCommand")
-	}
-
-	if callback != nil {
-		eg.Go(func() error {
-			return callback(ctx, stream)
-		})
-	}
-
-	if err := eg.Wait(); err != nil {
-		return nil, errors.Wrap(err, "do remote command")
 	}
 
 	resp = new(command.Ret)
@@ -111,4 +89,42 @@ func (s *RemoteXServer) handleRemoteStream(ctx context.Context, stream connectio
 	}
 
 	return resp, nil
+}
+
+func (s *RemoteXServer) HandleCommandWithRemote(ctx context.Context, nodeId common.NodeID, cmd *command.Command) (resp *command.Ret, err error) {
+	remoteNode, err := s.NodeService.GetNode(nodeId)
+	if err != nil {
+		return nil, errors.Wrap(err, "getNode")
+	}
+
+	connId := remoteNode.GetConnectionId()
+
+	conn, err := s.ConnService.GetConnection(connId)
+	if err != nil {
+		return nil, errors.Wrap(err, "getConnection")
+	}
+
+	stream, err := conn.OpenStream()
+	if err != nil {
+		return nil, errors.Wrap(err, "openStream")
+	}
+	defer stream.Close()
+
+	return s.CommandService.DoAcceptCommand(ctx, cmd, stream)
+}
+
+func (s *RemoteXServer) HandleCommandInBackground(ctx context.Context, nodeId common.NodeID, cmd *command.Command) (resp *command.Ret, err error) {
+	remoteNode, err := s.NodeService.GetNode(nodeId)
+	if err != nil {
+		return nil, errors.Wrap(err, "getNode")
+	}
+
+	connId := remoteNode.GetConnectionId()
+
+	conn, err := s.ConnService.GetConnection(connId)
+	if err != nil {
+		return nil, errors.Wrap(err, "getConnection")
+	}
+
+	return s.CommandService.DoOriginCommand(ctx, cmd, conn)
 }

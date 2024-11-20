@@ -94,7 +94,6 @@ func (i *InternalConn) AcceptStream() (Stream, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	stream.SetNodeId(i.GetNodeId())
 	return stream, nil
 }
@@ -144,8 +143,8 @@ func PackTrackerStream(manager *tracker.Manager, stream Stream) *TrackerStream {
 	}
 }
 
-func (t *TrackerStream) Pack(stream Stream, opts *PackOpts) Stream {
-	return PackTrackerStream(opts.TrackerManager, stream)
+func (t *TrackerStream) Pack(stream Stream) Stream {
+	return PackTrackerStream(tracker.Trackermanager, stream)
 }
 
 func (t *TrackerStream) Read(p []byte) (n int, err error) {
@@ -189,8 +188,8 @@ func PackLimiterStream(stream Stream, limiter *limiter.Limiter) *LimiterStream {
 	}
 }
 
-func (l *LimiterStream) Pack(stream Stream, opts *PackOpts) Stream {
-	return PackLimiterStream(stream, opts.Limiter)
+func (l *LimiterStream) Pack(stream Stream) Stream {
+	return PackLimiterStream(stream, limiter.StreamLimiter)
 }
 
 // Read rewrite the method to use LimiterReader
@@ -239,7 +238,7 @@ func PackCounterStream(stream Stream) *CounterStream {
 	}
 }
 
-func (cc *CounterStream) Pack(stream Stream, _ *PackOpts) Stream {
+func (cc *CounterStream) Pack(stream Stream) Stream {
 	return PackCounterStream(stream)
 }
 

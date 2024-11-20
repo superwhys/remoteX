@@ -28,6 +28,6 @@ func GetDialerFactory(uri *url.URL) (DialerFactory, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown address scheme %q", uri.Scheme)
 	}
-	
+
 	return dialerFactory, nil
 }

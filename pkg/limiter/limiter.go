@@ -19,17 +19,18 @@ type Limiter struct {
 	maxRecv, maxSend int
 }
 
-func NewLimiter(nodeId common.NodeID, maxRecv, maxSend int) *Limiter {
-	l := &Limiter{
-		myID:         nodeId,
+var (
+	StreamLimiter *Limiter
+)
+
+func InitLimiter(maxRecv, maxSend int) {
+	StreamLimiter = &Limiter{
 		mu:           sync.Mutex{},
 		readerWaiter: NewBaseWaiter(maxRecv),
 		writerWaiter: NewBaseWaiter(maxSend),
 		maxRecv:      maxRecv,
 		maxSend:      maxSend,
 	}
-
-	return l
 }
 
 func (l *Limiter) newLimitReader(r io.ReadCloser) *LimitReader {

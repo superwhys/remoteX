@@ -3,7 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
-	
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-puzzles/puzzles/pgin"
 	"github.com/superwhys/remoteX/domain/command"
@@ -25,12 +25,12 @@ func (l *listDirReq) toCommand(t command.CommandType) *command.Command {
 
 func (a *RemoteXAPI) listDir(c *gin.Context, req *listDirReq) {
 	cmd := req.toCommand(command.Listdir)
-	ret, err := a.srv.HandleCommand(c, cmd, nil)
+	ret, err := a.srv.HandleLocalCommand(c, cmd)
 	if err != nil {
 		pgin.ReturnError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	
+
 	pgin.ReturnSuccess(c, ret)
 }
 
@@ -50,11 +50,11 @@ func (l *listRemoteDir) toCommand(t command.CommandType) *command.Command {
 
 func (a *RemoteXAPI) listRemoteDir(c *gin.Context, req *listRemoteDir) {
 	cmd := req.toCommand(command.Listdir)
-	resp, err := a.srv.HandleRemoteCommand(c, common.NodeID(req.NodeId), cmd, nil)
+	resp, err := a.srv.HandleCommandWithRemote(c, common.NodeID(req.NodeId), cmd)
 	if err != nil {
 		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("handle remote command error: %v", err))
 		return
 	}
-	
+
 	pgin.ReturnSuccess(c, resp)
 }

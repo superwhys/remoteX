@@ -1,30 +1,20 @@
 package connection
 
-import (
-	"github.com/superwhys/remoteX/pkg/limiter"
-	"github.com/superwhys/remoteX/pkg/tracker"
-)
-
-type PackOpts struct {
-	Limiter        *limiter.Limiter
-	TrackerManager *tracker.Manager
-}
-
 type packer interface {
-	Pack(stream Stream, opts *PackOpts) Stream
+	Pack(stream Stream) Stream
 }
 
 var (
 	packers = []packer{
-		// &TrackerStream{},
+		&TrackerStream{},
 		&LimiterStream{},
 		&CounterStream{},
 	}
 )
 
-func PackStream(stream Stream, opts *PackOpts) Stream {
+func PackStream(stream Stream) Stream {
 	for _, p := range packers {
-		stream = p.Pack(stream, opts)
+		stream = p.Pack(stream)
 	}
 	return stream
 }

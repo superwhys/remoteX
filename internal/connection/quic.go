@@ -78,7 +78,10 @@ func (c *QuicConnection) AcceptStream() (connection.Stream, error) {
 		return nil, err
 	}
 
-	return NewQuicStream(c.connId, c.LocalAddr(), c.RemoteAddr(), stream), nil
+	s := NewQuicStream(c.connId, c.LocalAddr(), c.RemoteAddr(), stream)
+	s = connection.PackStream(s)
+
+	return s, nil
 }
 
 func (c *QuicConnection) OpenStream() (connection.Stream, error) {
@@ -86,8 +89,10 @@ func (c *QuicConnection) OpenStream() (connection.Stream, error) {
 	if err != nil {
 		return nil, err
 	}
+	s := NewQuicStream(c.connId, c.LocalAddr(), c.RemoteAddr(), stream)
+	s = connection.PackStream(s)
 
-	return NewQuicStream(c.connId, c.LocalAddr(), c.RemoteAddr(), stream), nil
+	return s, nil
 }
 
 func (c *QuicConnection) ConnectionState() tls.ConnectionState {
@@ -103,7 +108,7 @@ type QuicStream struct {
 	localAddr  net.Addr
 }
 
-func NewQuicStream(connId string, localAddr, remoteAddr net.Addr, stream quic.Stream) *QuicStream {
+func NewQuicStream(connId string, localAddr, remoteAddr net.Addr, stream quic.Stream) connection.Stream {
 	return &QuicStream{
 		remoteAddr: remoteAddr,
 		localAddr:  localAddr,

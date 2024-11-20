@@ -23,7 +23,11 @@ func (a *RemoteXAPI) SetupHttpServer() *gin.Engine {
 	router.GET("/list/dir", pgin.RequestHandler(a.listDir))
 	router.POST("/sync/pull", pgin.RequestHandler(a.pullEntry))
 	router.POST("/sync/push", pgin.RequestHandler(a.pushEntry))
+	router.POST("/tunnel/forward", pgin.RequestHandler(a.tunnelForward))
+	router.POST("/tunnel/close", pgin.RequestHandler(a.closeTunnel))
+	router.GET("/tunnel/list", a.listTunnel)
 
+	// nodeRouter is used to handle remote commands
 	nodeRouter := router.Group("/node/:nodeId")
 	{
 		nodeRouter.GET("", pgin.RequestHandler(a.getNode))

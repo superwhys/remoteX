@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"time"
-	
+
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/connection"
@@ -15,7 +15,7 @@ func (s *RemoteXServer) schedulerHeartbeat(ctx context.Context, conn connection.
 		streamGetter func() (connection.Stream, error)
 		handler      func(stream connection.Stream) error
 	)
-	
+
 	switch conn.IsServer() {
 	case true:
 		streamGetter = conn.AcceptStream
@@ -24,30 +24,30 @@ func (s *RemoteXServer) schedulerHeartbeat(ctx context.Context, conn connection.
 		streamGetter = conn.OpenStream
 		handler = s.sendHeartbeat
 	}
-	
+
 	hbStream, err := streamGetter()
 	if err != nil {
 		return errors.Wrap(err, "failed to get heartbeat stream")
 	}
 	defer hbStream.Close()
-	
+
 	// close the channel to notify commandScheduler
 	close(hbStartNotify)
-	
+
 	ticket := time.NewTicker(s.heartbeatInterval)
 	defer ticket.Stop()
-	
+
 	for {
 		if err := hbStream.SetDeadline(time.Now().Add(s.heartbeatInterval)); err != nil {
 			return errors.Wrap(err, "failed to set write deadline")
 		}
-		
+
 		if err := handler(hbStream); err != nil {
 			return errors.Wrap(err, "failed to handle heartbeat")
 		}
-		
+
 		conn.UpdateLastHeartbeat()
-		
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -62,13 +62,13 @@ func (s *RemoteXServer) sendHeartbeat(stream connection.Stream) error {
 		return errors.Wrap(err, "failed to refresh current node")
 	}
 	cn.IsLocal = false
-	
+
 	if err := stream.WriteMessage(cn); err != nil {
 		return errors.Wrap(err, "failed to write heartbeat message")
 	}
-	
+
 	plog.Debugf("send heartbeat to %v", stream.RemoteAddr())
-	
+
 	return nil
 }
 
@@ -77,11 +77,11 @@ func (s *RemoteXServer) receiveHeartbeat(stream connection.Stream) error {
 	if err := stream.ReadMessage(rn); err != nil {
 		return errors.Wrap(err, "failed to read heartbeat message")
 	}
-	
+
 	if err := s.NodeService.UpdateHeartbeat(stream.GetNodeId()); err != nil {
 		return errors.Wrap(err, "failed to update heartbeat")
 	}
-	
+
 	plog.Debugf("receive heartbeat from node: %v remoteAddr: %v", rn.NodeId, stream.RemoteAddr())
 	return nil
 }

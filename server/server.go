@@ -33,7 +33,6 @@ type RemoteXServer struct {
 	CommandService command.Service
 
 	opt               *Option
-	packOpts          *connection.PackOpts
 	heartbeatInterval time.Duration
 
 	dialTasks chan *connection.DialTask
@@ -45,6 +44,10 @@ type RemoteXServer struct {
 func NewRemoteXServer(opt *Option) *RemoteXServer {
 	local := opt.Local
 	transConf := opt.Conf.TransConf
+
+	limiter.InitLimiter(transConf.MaxRecvKbps, transConf.MaxRecvKbps)
+	tracker.InitTrackerManager()
+
 	server := &RemoteXServer{
 		opt:        opt,
 		Supervisor: suture.NewSimple("RemoteX.Service"),
@@ -54,12 +57,8 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 		ConnService:       connSrv.NewConnectionService(local.URL(), opt.TlsConfig),
 		CommandService:    commandSrv.NewCommandService(),
 		heartbeatInterval: time.Second * time.Duration(opt.Conf.HeartbeatInterval),
-		packOpts: &connection.PackOpts{
-			Limiter:        limiter.NewLimiter(local.NodeId, transConf.MaxRecvKbps, transConf.MaxSendKbps),
-			TrackerManager: tracker.CreateTrackerManager(),
-		},
-		dialTasks:   make(chan *connection.DialTask),
-		connections: make(chan connection.TlsConn),
+		dialTasks:         make(chan *connection.DialTask),
+		connections:       make(chan connection.TlsConn),
 	}
 
 	listener.InitListener()

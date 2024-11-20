@@ -15,6 +15,10 @@ enum CommandType {
 	Screenshot = 4;
 	Forward = 5;
 	Reverse = 6;
+	ForwardReceive = 7;
+	ReverseReceive = 8;
+	ListTunnel = 9;
+	CloseTunnel = 10;
 }
 
 message Command {
@@ -37,4 +41,35 @@ message Ret {
 	google.protobuf.Any resp = 1 [(ext.nullable) = true];
   	uint64 err_no = 2;
   	string err_msg = 3;
+}
+
+enum TunnelDirection {
+	DIRECTION_KNOWN = 0;
+	DIRECTION_FORWARD = 1;
+	DIRECTION_REVERSE = 2;
+}
+
+message TunnelConnect {
+	string tunnel_key = 1;
+	string addr = 2;
+	TunnelDirection direction = 3;
+}
+
+message TunnelConnectResp{
+	string tunnel_key = 1;
+	bool success = 2;
+	string error = 3;
+}
+
+
+
+message Tunnel {
+	string tunnel_key = 1;
+	string local_addr = 2 [(ext.json) = "local_addr,omitempty"];
+	string remote_addr = 3 [(ext.json) = "remote_addr,omitempty"];
+	TunnelDirection direction = 4;
+}
+
+message ListTunnelResp {
+	repeated Tunnel tunnels = 1 [(ext.nullable) = true];
 }

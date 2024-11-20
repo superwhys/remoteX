@@ -28,33 +28,45 @@ type CommandType int32
 
 const (
 	// EMPTY is the type of command sent during connection establishment
-	Empty      CommandType = 0
-	Listdir    CommandType = 1
-	Push       CommandType = 2
-	Pull       CommandType = 3
-	Screenshot CommandType = 4
-	Forward    CommandType = 5
-	Reverse    CommandType = 6
+	Empty          CommandType = 0
+	Listdir        CommandType = 1
+	Push           CommandType = 2
+	Pull           CommandType = 3
+	Screenshot     CommandType = 4
+	Forward        CommandType = 5
+	Reverse        CommandType = 6
+	Forwardreceive CommandType = 7
+	Reversereceive CommandType = 8
+	Listtunnel     CommandType = 9
+	Closetunnel    CommandType = 10
 )
 
 var CommandType_name = map[int32]string{
-	0: "EMPTY",
-	1: "ListDir",
-	2: "Push",
-	3: "Pull",
-	4: "Screenshot",
-	5: "Forward",
-	6: "Reverse",
+	0:  "EMPTY",
+	1:  "ListDir",
+	2:  "Push",
+	3:  "Pull",
+	4:  "Screenshot",
+	5:  "Forward",
+	6:  "Reverse",
+	7:  "ForwardReceive",
+	8:  "ReverseReceive",
+	9:  "ListTunnel",
+	10: "CloseTunnel",
 }
 
 var CommandType_value = map[string]int32{
-	"EMPTY":      0,
-	"ListDir":    1,
-	"Push":       2,
-	"Pull":       3,
-	"Screenshot": 4,
-	"Forward":    5,
-	"Reverse":    6,
+	"EMPTY":          0,
+	"ListDir":        1,
+	"Push":           2,
+	"Pull":           3,
+	"Screenshot":     4,
+	"Forward":        5,
+	"Reverse":        6,
+	"ForwardReceive": 7,
+	"ReverseReceive": 8,
+	"ListTunnel":     9,
+	"CloseTunnel":    10,
 }
 
 func (x CommandType) String() string {
@@ -63,6 +75,34 @@ func (x CommandType) String() string {
 
 func (CommandType) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_12622ffd59563e51, []int{0}
+}
+
+type TunnelDirection int32
+
+const (
+	DirectionKnown   TunnelDirection = 0
+	DirectionForward TunnelDirection = 1
+	DirectionReverse TunnelDirection = 2
+)
+
+var TunnelDirection_name = map[int32]string{
+	0: "DIRECTION_KNOWN",
+	1: "DIRECTION_FORWARD",
+	2: "DIRECTION_REVERSE",
+}
+
+var TunnelDirection_value = map[string]int32{
+	"DIRECTION_KNOWN":   0,
+	"DIRECTION_FORWARD": 1,
+	"DIRECTION_REVERSE": 2,
+}
+
+func (x TunnelDirection) String() string {
+	return proto.EnumName(TunnelDirection_name, int32(x))
+}
+
+func (TunnelDirection) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_12622ffd59563e51, []int{1}
 }
 
 type Command struct {
@@ -320,61 +360,321 @@ func (m *Ret) GetErrMsg() string {
 	return ""
 }
 
+type TunnelConnect struct {
+	TunnelKey string          `protobuf:"bytes,1,opt,name=tunnel_key,json=tunnelKey,proto3" json:"tunnelKey" yaml:"-"`
+	Addr      string          `protobuf:"bytes,2,opt,name=addr,proto3" json:"addr" yaml:"-"`
+	Direction TunnelDirection `protobuf:"varint,3,opt,name=direction,proto3,enum=command.TunnelDirection" json:"direction" yaml:"-"`
+}
+
+func (m *TunnelConnect) Reset()         { *m = TunnelConnect{} }
+func (m *TunnelConnect) String() string { return proto.CompactTextString(m) }
+func (*TunnelConnect) ProtoMessage()    {}
+func (*TunnelConnect) Descriptor() ([]byte, []int) {
+	return fileDescriptor_12622ffd59563e51, []int{3}
+}
+func (m *TunnelConnect) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *TunnelConnect) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_TunnelConnect.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *TunnelConnect) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TunnelConnect.Merge(m, src)
+}
+func (m *TunnelConnect) XXX_Size() int {
+	return m.ProtoSize()
+}
+func (m *TunnelConnect) XXX_DiscardUnknown() {
+	xxx_messageInfo_TunnelConnect.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TunnelConnect proto.InternalMessageInfo
+
+func (m *TunnelConnect) GetTunnelKey() string {
+	if m != nil {
+		return m.TunnelKey
+	}
+	return ""
+}
+
+func (m *TunnelConnect) GetAddr() string {
+	if m != nil {
+		return m.Addr
+	}
+	return ""
+}
+
+func (m *TunnelConnect) GetDirection() TunnelDirection {
+	if m != nil {
+		return m.Direction
+	}
+	return DirectionKnown
+}
+
+type TunnelConnectResp struct {
+	TunnelKey string `protobuf:"bytes,1,opt,name=tunnel_key,json=tunnelKey,proto3" json:"tunnelKey" yaml:"-"`
+	Success   bool   `protobuf:"varint,2,opt,name=success,proto3" json:"success" yaml:"-"`
+	Error     string `protobuf:"bytes,3,opt,name=error,proto3" json:"error" yaml:"-"`
+}
+
+func (m *TunnelConnectResp) Reset()         { *m = TunnelConnectResp{} }
+func (m *TunnelConnectResp) String() string { return proto.CompactTextString(m) }
+func (*TunnelConnectResp) ProtoMessage()    {}
+func (*TunnelConnectResp) Descriptor() ([]byte, []int) {
+	return fileDescriptor_12622ffd59563e51, []int{4}
+}
+func (m *TunnelConnectResp) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *TunnelConnectResp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_TunnelConnectResp.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *TunnelConnectResp) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TunnelConnectResp.Merge(m, src)
+}
+func (m *TunnelConnectResp) XXX_Size() int {
+	return m.ProtoSize()
+}
+func (m *TunnelConnectResp) XXX_DiscardUnknown() {
+	xxx_messageInfo_TunnelConnectResp.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_TunnelConnectResp proto.InternalMessageInfo
+
+func (m *TunnelConnectResp) GetTunnelKey() string {
+	if m != nil {
+		return m.TunnelKey
+	}
+	return ""
+}
+
+func (m *TunnelConnectResp) GetSuccess() bool {
+	if m != nil {
+		return m.Success
+	}
+	return false
+}
+
+func (m *TunnelConnectResp) GetError() string {
+	if m != nil {
+		return m.Error
+	}
+	return ""
+}
+
+type Tunnel struct {
+	TunnelKey  string          `protobuf:"bytes,1,opt,name=tunnel_key,json=tunnelKey,proto3" json:"tunnelKey" yaml:"-"`
+	LocalAddr  string          `protobuf:"bytes,2,opt,name=local_addr,json=localAddr,proto3" json:"local_addr,omitempty" yaml:"-"`
+	RemoteAddr string          `protobuf:"bytes,3,opt,name=remote_addr,json=remoteAddr,proto3" json:"remote_addr,omitempty" yaml:"-"`
+	Direction  TunnelDirection `protobuf:"varint,4,opt,name=direction,proto3,enum=command.TunnelDirection" json:"direction" yaml:"-"`
+}
+
+func (m *Tunnel) Reset()         { *m = Tunnel{} }
+func (m *Tunnel) String() string { return proto.CompactTextString(m) }
+func (*Tunnel) ProtoMessage()    {}
+func (*Tunnel) Descriptor() ([]byte, []int) {
+	return fileDescriptor_12622ffd59563e51, []int{5}
+}
+func (m *Tunnel) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *Tunnel) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_Tunnel.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *Tunnel) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Tunnel.Merge(m, src)
+}
+func (m *Tunnel) XXX_Size() int {
+	return m.ProtoSize()
+}
+func (m *Tunnel) XXX_DiscardUnknown() {
+	xxx_messageInfo_Tunnel.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Tunnel proto.InternalMessageInfo
+
+func (m *Tunnel) GetTunnelKey() string {
+	if m != nil {
+		return m.TunnelKey
+	}
+	return ""
+}
+
+func (m *Tunnel) GetLocalAddr() string {
+	if m != nil {
+		return m.LocalAddr
+	}
+	return ""
+}
+
+func (m *Tunnel) GetRemoteAddr() string {
+	if m != nil {
+		return m.RemoteAddr
+	}
+	return ""
+}
+
+func (m *Tunnel) GetDirection() TunnelDirection {
+	if m != nil {
+		return m.Direction
+	}
+	return DirectionKnown
+}
+
+type ListTunnelResp struct {
+	Tunnels []*Tunnel `protobuf:"bytes,1,rep,name=tunnels,proto3" json:"tunnels" yaml:"-"`
+}
+
+func (m *ListTunnelResp) Reset()         { *m = ListTunnelResp{} }
+func (m *ListTunnelResp) String() string { return proto.CompactTextString(m) }
+func (*ListTunnelResp) ProtoMessage()    {}
+func (*ListTunnelResp) Descriptor() ([]byte, []int) {
+	return fileDescriptor_12622ffd59563e51, []int{6}
+}
+func (m *ListTunnelResp) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *ListTunnelResp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_ListTunnelResp.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *ListTunnelResp) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ListTunnelResp.Merge(m, src)
+}
+func (m *ListTunnelResp) XXX_Size() int {
+	return m.ProtoSize()
+}
+func (m *ListTunnelResp) XXX_DiscardUnknown() {
+	xxx_messageInfo_ListTunnelResp.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ListTunnelResp proto.InternalMessageInfo
+
+func (m *ListTunnelResp) GetTunnels() []*Tunnel {
+	if m != nil {
+		return m.Tunnels
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterEnum("command.CommandType", CommandType_name, CommandType_value)
+	proto.RegisterEnum("command.TunnelDirection", TunnelDirection_name, TunnelDirection_value)
 	proto.RegisterType((*Command)(nil), "command.Command")
 	proto.RegisterMapType((map[string]Command_Arg)(nil), "command.Command.ArgsEntry")
 	proto.RegisterType((*Command_Arg)(nil), "command.Command.Arg")
 	proto.RegisterType((*MapResp)(nil), "command.MapResp")
 	proto.RegisterMapType((map[string]string)(nil), "command.MapResp.DataEntry")
 	proto.RegisterType((*Ret)(nil), "command.Ret")
+	proto.RegisterType((*TunnelConnect)(nil), "command.TunnelConnect")
+	proto.RegisterType((*TunnelConnectResp)(nil), "command.TunnelConnectResp")
+	proto.RegisterType((*Tunnel)(nil), "command.Tunnel")
+	proto.RegisterType((*ListTunnelResp)(nil), "command.ListTunnelResp")
 }
 
 func init() { proto.RegisterFile("domain/command/command.proto", fileDescriptor_12622ffd59563e51) }
 
 var fileDescriptor_12622ffd59563e51 = []byte{
-	// 648 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x94, 0x41, 0x6e, 0xd3, 0x4c,
-	0x14, 0xc7, 0x33, 0x71, 0xd2, 0xc4, 0x13, 0xa9, 0xb2, 0xe6, 0xeb, 0x87, 0x52, 0xab, 0xb2, 0xad,
-	0x08, 0xa4, 0x88, 0x42, 0x2c, 0x95, 0x05, 0xa8, 0x0b, 0xa4, 0x9a, 0xa6, 0x2a, 0x12, 0x45, 0x55,
-	0xa8, 0x10, 0xb0, 0xa9, 0x9c, 0x66, 0x70, 0x2c, 0x6c, 0x8f, 0x35, 0x33, 0x69, 0xf1, 0x82, 0x0b,
-	0x64, 0xc5, 0x05, 0x22, 0xf5, 0x00, 0x1c, 0x00, 0x24, 0x0e, 0xd0, 0x65, 0xd8, 0xb1, 0xb2, 0x44,
-	0xb3, 0xcb, 0x92, 0x13, 0xa0, 0x19, 0x3b, 0x25, 0x2e, 0x95, 0x60, 0x95, 0xbc, 0xdf, 0x7b, 0xff,
-	0x37, 0xff, 0x79, 0x6f, 0x12, 0xb8, 0x31, 0x20, 0xa1, 0xeb, 0x47, 0xf6, 0x09, 0x09, 0x43, 0x37,
-	0x1a, 0x2c, 0x3e, 0x3b, 0x31, 0x25, 0x9c, 0xa0, 0x5a, 0x1e, 0xea, 0x2a, 0x7e, 0xcf, 0x33, 0xa6,
-	0xaf, 0x7b, 0x84, 0x78, 0x01, 0xb6, 0x65, 0xd4, 0x1f, 0xbd, 0xb5, 0xdd, 0x28, 0xc9, 0x52, 0xad,
-	0x6f, 0x0a, 0xac, 0x3d, 0xc9, 0x14, 0xe8, 0x31, 0xac, 0xf0, 0x24, 0xc6, 0x4d, 0x60, 0x81, 0xf6,
-	0xea, 0xd6, 0x5a, 0x67, 0xd1, 0x38, 0xcf, 0x1f, 0x25, 0x31, 0x76, 0xd6, 0xe6, 0xa9, 0x29, 0xab,
-	0x7e, 0xa6, 0x66, 0x3d, 0x71, 0xc3, 0x60, 0xbb, 0x75, 0xbf, 0xd5, 0x93, 0x04, 0xed, 0xc3, 0x8a,
-	0x4b, 0x3d, 0xd6, 0x2c, 0x5b, 0x4a, 0xbb, 0xb1, 0xa5, 0x5f, 0xd7, 0x77, 0x76, 0xa8, 0xc7, 0xba,
-	0x11, 0xa7, 0x89, 0xd3, 0xbc, 0x48, 0xcd, 0x92, 0xe8, 0x24, 0xea, 0x8b, 0x9d, 0x04, 0xd1, 0xbf,
-	0x02, 0xa8, 0xec, 0x50, 0x0f, 0x3d, 0x84, 0x2a, 0xe3, 0xf4, 0xf8, 0xd4, 0x0d, 0x46, 0x99, 0x2d,
-	0xd5, 0x69, 0xce, 0x53, 0xb3, 0xce, 0x38, 0x7d, 0x29, 0xd8, 0xb2, 0x74, 0xbf, 0xd4, 0xbb, 0xe2,
-	0x42, 0xe8, 0x47, 0x3c, 0x17, 0x96, 0x2d, 0xd0, 0x56, 0x32, 0xa1, 0x1f, 0xf1, 0x1b, 0x85, 0x0b,
-	0x8e, 0xb6, 0x21, 0xec, 0x13, 0x12, 0xe4, 0x4a, 0xc5, 0x02, 0xed, 0xba, 0xb3, 0x3e, 0x4f, 0x4d,
-	0x55, 0xd0, 0x9b, 0xa4, 0xbf, 0x13, 0x4e, 0x0d, 0x56, 0xa5, 0x4c, 0xff, 0x00, 0xd5, 0xab, 0xbb,
-	0xa2, 0x3b, 0x50, 0x79, 0x87, 0x93, 0xdc, 0xfd, 0x7f, 0xf3, 0xd4, 0x14, 0x61, 0xe1, 0xce, 0x02,
-	0xa0, 0x6e, 0x2e, 0x96, 0x6e, 0x1b, 0x7f, 0x4e, 0x5f, 0x4c, 0xcf, 0x59, 0xcf, 0xe7, 0x96, 0x95,
-	0x16, 0x9a, 0x64, 0x68, 0xbb, 0xfc, 0x08, 0xb4, 0x3e, 0x03, 0x58, 0x3b, 0x70, 0xe3, 0x1e, 0x66,
-	0xb1, 0xd8, 0xc9, 0xc0, 0xe5, 0x6e, 0x13, 0x5c, 0xdb, 0x49, 0x9e, 0xef, 0xec, 0xba, 0xdc, 0xbd,
-	0xb6, 0x13, 0x51, 0x5f, 0xdc, 0x89, 0x20, 0xfa, 0x09, 0x54, 0xaf, 0x8a, 0xff, 0xf5, 0x52, 0x9b,
-	0xcb, 0x97, 0x52, 0x9d, 0xff, 0xff, 0x6a, 0xfd, 0x13, 0x80, 0x4a, 0x0f, 0x73, 0xb4, 0x07, 0x2b,
-	0x14, 0xb3, 0x58, 0x1e, 0x20, 0x86, 0x91, 0x3d, 0xe0, 0xce, 0xe2, 0x01, 0x77, 0x76, 0xa2, 0xc4,
-	0xd9, 0xb8, 0x48, 0x4d, 0x20, 0x0c, 0x8b, 0xca, 0xe5, 0x86, 0xe7, 0xd3, 0xdb, 0xa0, 0x27, 0x29,
-	0xba, 0x07, 0x57, 0x30, 0xa5, 0xc7, 0x11, 0x91, 0x0e, 0x2a, 0x99, 0x03, 0x4c, 0xe9, 0x73, 0x52,
-	0x74, 0x20, 0x11, 0xb2, 0x61, 0x4d, 0x54, 0x87, 0xcc, 0x93, 0x9b, 0x57, 0x9d, 0x5b, 0xf3, 0xd4,
-	0x14, 0x0d, 0x0e, 0x98, 0x57, 0xa8, 0xcf, 0xd9, 0xdd, 0x2f, 0x00, 0x36, 0x96, 0x7e, 0x1d, 0x68,
-	0x0d, 0x56, 0xbb, 0x07, 0x87, 0x47, 0xaf, 0xb5, 0x92, 0xae, 0x8e, 0x27, 0x56, 0xb5, 0x1b, 0xc6,
-	0x3c, 0x41, 0x4d, 0x58, 0x7b, 0xe6, 0x33, 0xbe, 0xeb, 0x53, 0x0d, 0xe8, 0x8d, 0xf1, 0xc4, 0x92,
-	0xe1, 0xc0, 0xa7, 0x08, 0xc1, 0xca, 0xe1, 0x88, 0x0d, 0xb5, 0xb2, 0x5e, 0x1f, 0x4f, 0x2c, 0xf9,
-	0x3d, 0x63, 0x41, 0xa0, 0x29, 0x0b, 0x16, 0x04, 0xc8, 0x80, 0xf0, 0xc5, 0x09, 0xc5, 0x38, 0x62,
-	0x43, 0xc2, 0xb5, 0x8a, 0xbe, 0x3a, 0x9e, 0x58, 0x4b, 0x44, 0x9c, 0xb0, 0x47, 0xe8, 0x99, 0x4b,
-	0x07, 0x5a, 0x35, 0x3b, 0x21, 0x0f, 0x45, 0xa6, 0x87, 0x4f, 0x31, 0x65, 0x58, 0x5b, 0xc9, 0x32,
-	0x79, 0xe8, 0x3c, 0x9d, 0xfe, 0x30, 0x4a, 0x17, 0x97, 0x06, 0x98, 0x5e, 0x1a, 0xe0, 0xe3, 0xcc,
-	0x28, 0x9d, 0xcf, 0x0c, 0x30, 0x9d, 0x19, 0xa5, 0xef, 0x33, 0xa3, 0xf4, 0x66, 0xd3, 0xf3, 0xf9,
-	0x70, 0xd4, 0x17, 0xef, 0xc5, 0x66, 0xa3, 0x18, 0xd3, 0xb3, 0x61, 0xc2, 0x6c, 0x8a, 0x43, 0xc2,
-	0xf1, 0x2b, 0xbb, 0xf8, 0x0f, 0xd4, 0x5f, 0x91, 0x7b, 0x79, 0xf0, 0x2b, 0x00, 0x00, 0xff, 0xff,
-	0x08, 0xbe, 0x8e, 0x3f, 0x9a, 0x04, 0x00, 0x00,
+	// 1014 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x96, 0x4d, 0x6f, 0xe3, 0x44,
+	0x18, 0xc7, 0xe3, 0x24, 0x6d, 0xe2, 0x27, 0xa2, 0xf5, 0x0e, 0x5d, 0x48, 0xad, 0x55, 0x6c, 0x45,
+	0x0b, 0x54, 0xdb, 0x25, 0x11, 0xe5, 0xc0, 0xaa, 0x42, 0x2b, 0xc5, 0x4d, 0xaa, 0x2d, 0xa5, 0xed,
+	0xe2, 0xad, 0x76, 0x79, 0x93, 0x22, 0x37, 0x1e, 0x52, 0x0b, 0xc7, 0x13, 0x8d, 0x9d, 0x96, 0x1c,
+	0xf8, 0x02, 0x39, 0x71, 0xe0, 0x1a, 0x69, 0x3f, 0x00, 0xdc, 0x39, 0x70, 0x46, 0x95, 0x38, 0x50,
+	0xc4, 0x85, 0x93, 0x25, 0xb6, 0xb7, 0x1c, 0xf7, 0x13, 0xa0, 0x79, 0x71, 0x12, 0xa7, 0x45, 0x20,
+	0xe0, 0xd4, 0xce, 0xef, 0xf9, 0x3f, 0xcf, 0x3c, 0x6f, 0xe3, 0x16, 0xee, 0xb8, 0xa4, 0xe7, 0x78,
+	0x41, 0xbd, 0x43, 0x7a, 0x3d, 0x27, 0x70, 0x93, 0x9f, 0xb5, 0x3e, 0x25, 0x11, 0x41, 0x05, 0x79,
+	0xd4, 0x55, 0xfc, 0x55, 0x24, 0x98, 0xbe, 0xde, 0x25, 0xa4, 0xeb, 0xe3, 0x3a, 0x3f, 0x9d, 0x0c,
+	0xbe, 0xa8, 0x3b, 0xc1, 0x50, 0x98, 0xaa, 0xbf, 0xe6, 0xa0, 0xb0, 0x23, 0x3c, 0xd0, 0x43, 0xc8,
+	0x47, 0xc3, 0x3e, 0x2e, 0x2b, 0xa6, 0xb2, 0xb1, 0xb2, 0xb5, 0x56, 0x4b, 0x02, 0x4b, 0xfb, 0xf1,
+	0xb0, 0x8f, 0xad, 0xb5, 0x49, 0x6c, 0x70, 0xd5, 0xcb, 0xd8, 0x28, 0x0e, 0x9d, 0x9e, 0xbf, 0x5d,
+	0x7d, 0xbb, 0x6a, 0x73, 0x82, 0x1e, 0x41, 0xde, 0xa1, 0xdd, 0xb0, 0x9c, 0x35, 0x73, 0x1b, 0xa5,
+	0x2d, 0x7d, 0xd1, 0xbf, 0xd6, 0xa0, 0xdd, 0xb0, 0x15, 0x44, 0x74, 0x68, 0x95, 0x2f, 0x62, 0x23,
+	0xc3, 0x22, 0x31, 0x7d, 0x3a, 0x12, 0x23, 0xfa, 0x8f, 0x0a, 0xe4, 0x1a, 0xb4, 0x8b, 0xde, 0x03,
+	0x35, 0x8c, 0x68, 0xfb, 0xcc, 0xf1, 0x07, 0x22, 0x2d, 0xd5, 0x2a, 0x4f, 0x62, 0xa3, 0x18, 0x46,
+	0xf4, 0x29, 0x63, 0xf3, 0xae, 0x8f, 0x32, 0xf6, 0x94, 0x33, 0x47, 0x2f, 0x88, 0xa4, 0x63, 0xd6,
+	0x54, 0x36, 0x72, 0xc2, 0xd1, 0x0b, 0xa2, 0x1b, 0x1d, 0x13, 0x8e, 0xb6, 0x01, 0x4e, 0x08, 0xf1,
+	0xa5, 0x67, 0xce, 0x54, 0x36, 0x8a, 0xd6, 0xfa, 0x24, 0x36, 0x54, 0x46, 0x6f, 0x72, 0x9d, 0x19,
+	0xac, 0x02, 0x2c, 0x71, 0x37, 0xfd, 0x6b, 0x50, 0xa7, 0xb5, 0xa2, 0x37, 0x20, 0xf7, 0x25, 0x1e,
+	0xca, 0xec, 0x5f, 0x9d, 0xc4, 0x06, 0x3b, 0xa6, 0x6a, 0x66, 0x00, 0xb5, 0xa4, 0x33, 0xcf, 0xb6,
+	0x74, 0xbd, 0xfb, 0xac, 0x7b, 0xd6, 0xba, 0xec, 0x9b, 0x90, 0xa6, 0x82, 0x08, 0xb4, 0x9d, 0x7d,
+	0xa0, 0x54, 0x7f, 0x50, 0xa0, 0x70, 0xe0, 0xf4, 0x6d, 0x1c, 0xf6, 0xd9, 0x4c, 0x5c, 0x27, 0x72,
+	0xca, 0xca, 0xc2, 0x4c, 0xa4, 0xbd, 0xd6, 0x74, 0x22, 0x67, 0x61, 0x26, 0x4c, 0x9f, 0x9e, 0x09,
+	0x23, 0x7a, 0x07, 0xd4, 0xa9, 0xf8, 0x9f, 0x16, 0xb5, 0x39, 0x5f, 0x94, 0x6a, 0xdd, 0xfe, 0xdb,
+	0xd4, 0xbf, 0x53, 0x20, 0x67, 0xe3, 0x08, 0xed, 0x42, 0x9e, 0xe2, 0xb0, 0xcf, 0x2f, 0x60, 0xcd,
+	0x10, 0x0b, 0x5c, 0x4b, 0x16, 0xb8, 0xd6, 0x08, 0x86, 0xd6, 0x9d, 0x8b, 0xd8, 0x50, 0x58, 0xc2,
+	0x4c, 0x39, 0x1f, 0xf0, 0xf9, 0xe5, 0x5d, 0xc5, 0xe6, 0x14, 0xdd, 0x87, 0x65, 0x4c, 0x69, 0x3b,
+	0x20, 0x3c, 0x83, 0xbc, 0xc8, 0x00, 0x53, 0x7a, 0x48, 0xd2, 0x19, 0x70, 0x84, 0xea, 0x50, 0x60,
+	0xea, 0x5e, 0xd8, 0xe5, 0x93, 0x57, 0xad, 0xd7, 0x26, 0xb1, 0xc1, 0x02, 0x1c, 0x84, 0xdd, 0x94,
+	0x5e, 0xb2, 0xea, 0x4f, 0x0a, 0xbc, 0x72, 0x3c, 0x08, 0x02, 0xec, 0xef, 0x90, 0x20, 0xc0, 0x9d,
+	0x08, 0x3d, 0x00, 0x88, 0x38, 0x68, 0xcf, 0xfa, 0xc3, 0xf7, 0x47, 0xd0, 0xfd, 0x85, 0x2e, 0xcd,
+	0x30, 0xda, 0x80, 0xbc, 0xe3, 0xba, 0x54, 0xb6, 0x8a, 0xbf, 0x33, 0x76, 0x5e, 0x78, 0x1d, 0xae,
+	0x4b, 0xd1, 0x47, 0xa0, 0xba, 0x1e, 0xc5, 0x9d, 0xc8, 0x23, 0x01, 0x4f, 0x74, 0x65, 0xab, 0x3c,
+	0x1d, 0xac, 0x48, 0xa7, 0x99, 0xd8, 0xc5, 0xe5, 0x53, 0x79, 0xfa, 0xf2, 0x29, 0xae, 0x7e, 0xaf,
+	0xc0, 0xad, 0x54, 0x21, 0x7c, 0x79, 0xfe, 0x7d, 0x31, 0xef, 0x40, 0x21, 0x1c, 0x74, 0x3a, 0x38,
+	0x0c, 0x79, 0x3d, 0x45, 0xeb, 0xf5, 0x49, 0x6c, 0x24, 0x28, 0xe5, 0x94, 0x40, 0xb6, 0x2b, 0x98,
+	0x52, 0x42, 0x65, 0xeb, 0x93, 0x49, 0x11, 0x7a, 0x6d, 0x52, 0x84, 0x56, 0x7f, 0xcb, 0xc2, 0xb2,
+	0xc8, 0xf7, 0x3f, 0x24, 0xf9, 0x19, 0x80, 0x4f, 0x3a, 0x8e, 0xdf, 0x9e, 0xeb, 0xfb, 0xfb, 0x93,
+	0xd8, 0x58, 0x9b, 0xd1, 0xfb, 0xa4, 0xe7, 0x45, 0xb8, 0xd7, 0x8f, 0x52, 0x41, 0x5e, 0xfe, 0x72,
+	0xf7, 0x46, 0x8d, 0xad, 0x72, 0xda, 0x60, 0x43, 0x6a, 0x43, 0x89, 0xe2, 0x1e, 0x89, 0xb0, 0x88,
+	0x2e, 0x8a, 0x7a, 0x38, 0x89, 0x8d, 0xdb, 0x73, 0xf8, 0x2f, 0xc3, 0xdf, 0x2c, 0xb2, 0x41, 0xe0,
+	0xc6, 0xb5, 0x2d, 0xc8, 0xff, 0x2f, 0x5b, 0xf0, 0x39, 0xac, 0x7c, 0xe8, 0x85, 0x91, 0x70, 0xe6,
+	0x1b, 0xf0, 0x01, 0x14, 0x44, 0xbf, 0x42, 0xf9, 0x05, 0x59, 0x5d, 0xb8, 0xc2, 0x32, 0xe4, 0x2b,
+	0x4c, 0x74, 0xd7, 0x1e, 0x62, 0x62, 0xb8, 0xf7, 0x73, 0x16, 0x4a, 0x73, 0x7f, 0x4a, 0xd0, 0x1a,
+	0x2c, 0xb5, 0x0e, 0x1e, 0x1f, 0x7f, 0xa2, 0x65, 0x74, 0x75, 0x34, 0x36, 0x97, 0x5a, 0xac, 0x44,
+	0x54, 0x86, 0x02, 0xcb, 0xa1, 0xe9, 0x51, 0x4d, 0xd1, 0x4b, 0xa3, 0xb1, 0xc9, 0x8f, 0xae, 0x47,
+	0x11, 0x82, 0xfc, 0xe3, 0x41, 0x78, 0xaa, 0x65, 0xf5, 0xe2, 0x68, 0x6c, 0xf2, 0xdf, 0x05, 0xf3,
+	0x7d, 0x2d, 0x97, 0x30, 0xdf, 0x47, 0x15, 0x80, 0x27, 0x1d, 0x8a, 0x71, 0x10, 0x9e, 0x92, 0x48,
+	0xcb, 0xeb, 0x2b, 0xa3, 0xb1, 0x39, 0x47, 0xd8, 0x0d, 0xbb, 0x84, 0x9e, 0x3b, 0xd4, 0xd5, 0x96,
+	0xc4, 0x0d, 0xf2, 0xc8, 0x2c, 0x36, 0x3e, 0xc3, 0x34, 0xc4, 0xda, 0xb2, 0xb0, 0xc8, 0x23, 0x7a,
+	0x13, 0x56, 0xa4, 0xc8, 0xc6, 0x1d, 0xec, 0x9d, 0x61, 0xad, 0xa0, 0xa3, 0xd1, 0xd8, 0x4c, 0x28,
+	0x15, 0x94, 0xe9, 0xa4, 0x4b, 0xa2, 0x2b, 0x0a, 0x9d, 0xa4, 0x89, 0xae, 0x02, 0x30, 0xeb, 0xb4,
+	0xa6, 0x8a, 0x1c, 0x19, 0x11, 0xcd, 0x42, 0x26, 0x94, 0x76, 0x7c, 0x12, 0x62, 0x29, 0x00, 0x7d,
+	0x75, 0x34, 0x36, 0x05, 0x12, 0x8a, 0x7b, 0xdf, 0x2a, 0xb0, 0xba, 0x30, 0x65, 0xf4, 0x16, 0xac,
+	0x36, 0xf7, 0xec, 0xd6, 0xce, 0xf1, 0xde, 0xd1, 0x61, 0x7b, 0xff, 0xf0, 0xe8, 0xd9, 0xa1, 0x96,
+	0x11, 0xd7, 0x4f, 0x35, 0xfb, 0x01, 0x39, 0x0f, 0xd0, 0x26, 0xdc, 0x9a, 0x09, 0x77, 0x8f, 0xec,
+	0x67, 0x0d, 0xbb, 0xa9, 0x29, 0xfa, 0xda, 0x68, 0x6c, 0x6a, 0x53, 0x69, 0xd2, 0x95, 0x94, 0xd8,
+	0x6e, 0x3d, 0x6d, 0xd9, 0x4f, 0x5a, 0x5a, 0x76, 0x41, 0x2c, 0xeb, 0xb3, 0xf6, 0x2e, 0xff, 0xa8,
+	0x64, 0x2e, 0x5e, 0x54, 0x94, 0xcb, 0x17, 0x15, 0xe5, 0x9b, 0xab, 0x4a, 0xe6, 0xf9, 0x55, 0x45,
+	0xb9, 0xbc, 0xaa, 0x64, 0x7e, 0xbf, 0xaa, 0x64, 0x3e, 0xdd, 0xec, 0x7a, 0xd1, 0xe9, 0xe0, 0x84,
+	0xed, 0x50, 0x3d, 0x1c, 0xf4, 0x31, 0x3d, 0x3f, 0x1d, 0x86, 0x75, 0xb1, 0xd4, 0x1f, 0xd7, 0xd3,
+	0xff, 0xd7, 0x9c, 0x2c, 0xf3, 0xaf, 0xfd, 0xbb, 0x7f, 0x06, 0x00, 0x00, 0xff, 0xff, 0x6a, 0xc4,
+	0xe6, 0xf5, 0xf0, 0x08, 0x00, 0x00,
 }
 
 func (m *Command) Marshal() (dAtA []byte, err error) {
@@ -593,6 +893,181 @@ func (m *Ret) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *TunnelConnect) Marshal() (dAtA []byte, err error) {
+	size := m.ProtoSize()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TunnelConnect) MarshalTo(dAtA []byte) (int, error) {
+	size := m.ProtoSize()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *TunnelConnect) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Direction != 0 {
+		i = encodeVarintCommand(dAtA, i, uint64(m.Direction))
+		i--
+		dAtA[i] = 0x18
+	}
+	if len(m.Addr) > 0 {
+		i -= len(m.Addr)
+		copy(dAtA[i:], m.Addr)
+		i = encodeVarintCommand(dAtA, i, uint64(len(m.Addr)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.TunnelKey) > 0 {
+		i -= len(m.TunnelKey)
+		copy(dAtA[i:], m.TunnelKey)
+		i = encodeVarintCommand(dAtA, i, uint64(len(m.TunnelKey)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *TunnelConnectResp) Marshal() (dAtA []byte, err error) {
+	size := m.ProtoSize()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TunnelConnectResp) MarshalTo(dAtA []byte) (int, error) {
+	size := m.ProtoSize()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *TunnelConnectResp) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Error) > 0 {
+		i -= len(m.Error)
+		copy(dAtA[i:], m.Error)
+		i = encodeVarintCommand(dAtA, i, uint64(len(m.Error)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.Success {
+		i--
+		if m.Success {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x10
+	}
+	if len(m.TunnelKey) > 0 {
+		i -= len(m.TunnelKey)
+		copy(dAtA[i:], m.TunnelKey)
+		i = encodeVarintCommand(dAtA, i, uint64(len(m.TunnelKey)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *Tunnel) Marshal() (dAtA []byte, err error) {
+	size := m.ProtoSize()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *Tunnel) MarshalTo(dAtA []byte) (int, error) {
+	size := m.ProtoSize()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Tunnel) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Direction != 0 {
+		i = encodeVarintCommand(dAtA, i, uint64(m.Direction))
+		i--
+		dAtA[i] = 0x20
+	}
+	if len(m.RemoteAddr) > 0 {
+		i -= len(m.RemoteAddr)
+		copy(dAtA[i:], m.RemoteAddr)
+		i = encodeVarintCommand(dAtA, i, uint64(len(m.RemoteAddr)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if len(m.LocalAddr) > 0 {
+		i -= len(m.LocalAddr)
+		copy(dAtA[i:], m.LocalAddr)
+		i = encodeVarintCommand(dAtA, i, uint64(len(m.LocalAddr)))
+		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.TunnelKey) > 0 {
+		i -= len(m.TunnelKey)
+		copy(dAtA[i:], m.TunnelKey)
+		i = encodeVarintCommand(dAtA, i, uint64(len(m.TunnelKey)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *ListTunnelResp) Marshal() (dAtA []byte, err error) {
+	size := m.ProtoSize()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *ListTunnelResp) MarshalTo(dAtA []byte) (int, error) {
+	size := m.ProtoSize()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ListTunnelResp) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Tunnels) > 0 {
+		for iNdEx := len(m.Tunnels) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Tunnels[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintCommand(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintCommand(dAtA []byte, offset int, v uint64) int {
 	offset -= sovCommand(v)
 	base := offset
@@ -698,6 +1173,85 @@ func (m *Ret) ProtoSize() (n int) {
 	l = len(m.ErrMsg)
 	if l > 0 {
 		n += 1 + l + sovCommand(uint64(l))
+	}
+	return n
+}
+
+func (m *TunnelConnect) ProtoSize() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.TunnelKey)
+	if l > 0 {
+		n += 1 + l + sovCommand(uint64(l))
+	}
+	l = len(m.Addr)
+	if l > 0 {
+		n += 1 + l + sovCommand(uint64(l))
+	}
+	if m.Direction != 0 {
+		n += 1 + sovCommand(uint64(m.Direction))
+	}
+	return n
+}
+
+func (m *TunnelConnectResp) ProtoSize() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.TunnelKey)
+	if l > 0 {
+		n += 1 + l + sovCommand(uint64(l))
+	}
+	if m.Success {
+		n += 2
+	}
+	l = len(m.Error)
+	if l > 0 {
+		n += 1 + l + sovCommand(uint64(l))
+	}
+	return n
+}
+
+func (m *Tunnel) ProtoSize() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.TunnelKey)
+	if l > 0 {
+		n += 1 + l + sovCommand(uint64(l))
+	}
+	l = len(m.LocalAddr)
+	if l > 0 {
+		n += 1 + l + sovCommand(uint64(l))
+	}
+	l = len(m.RemoteAddr)
+	if l > 0 {
+		n += 1 + l + sovCommand(uint64(l))
+	}
+	if m.Direction != 0 {
+		n += 1 + sovCommand(uint64(m.Direction))
+	}
+	return n
+}
+
+func (m *ListTunnelResp) ProtoSize() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Tunnels) > 0 {
+		for _, e := range m.Tunnels {
+			l = e.ProtoSize()
+			n += 1 + l + sovCommand(uint64(l))
+		}
 	}
 	return n
 }
@@ -1321,6 +1875,522 @@ func (m *Ret) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.ErrMsg = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipCommand(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthCommand
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TunnelConnect) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowCommand
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TunnelConnect: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TunnelConnect: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TunnelKey", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCommand
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCommand
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCommand
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TunnelKey = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Addr", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCommand
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCommand
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCommand
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Addr = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Direction", wireType)
+			}
+			m.Direction = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCommand
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Direction |= TunnelDirection(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipCommand(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthCommand
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TunnelConnectResp) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowCommand
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TunnelConnectResp: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TunnelConnectResp: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TunnelKey", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCommand
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCommand
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCommand
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TunnelKey = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Success", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCommand
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Success = bool(v != 0)
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Error", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCommand
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCommand
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCommand
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Error = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipCommand(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthCommand
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *Tunnel) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowCommand
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: Tunnel: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: Tunnel: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field TunnelKey", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCommand
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCommand
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCommand
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.TunnelKey = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field LocalAddr", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCommand
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCommand
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCommand
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.LocalAddr = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field RemoteAddr", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCommand
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthCommand
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthCommand
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.RemoteAddr = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Direction", wireType)
+			}
+			m.Direction = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCommand
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Direction |= TunnelDirection(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipCommand(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthCommand
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *ListTunnelResp) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowCommand
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: ListTunnelResp: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: ListTunnelResp: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Tunnels", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowCommand
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthCommand
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthCommand
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Tunnels = append(m.Tunnels, &Tunnel{})
+			if err := m.Tunnels[len(m.Tunnels)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

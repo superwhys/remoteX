@@ -1,15 +1,12 @@
 package api
 
 import (
-	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-puzzles/puzzles/pgin"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
-	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/pkg/common"
 )
 
@@ -34,19 +31,10 @@ func (p *syncRequest) toCommand(t command.CommandType) *command.Command {
 }
 
 func (a *RemoteXAPI) pullEntry(c *gin.Context, req *syncRequest) {
-	callback := func(ctx context.Context, stream connection.Stream) error {
-		localCmd := req.toCommand(command.Pull)
-		_, err := a.srv.HandleCommand(ctx, localCmd, stream)
-		if err != nil {
-			return errors.Wrapf(err, "localCmd pull(%s -> %s)", req.Src, req.Dest)
-		}
-		return nil
-	}
-
-	remoteCmd := req.toCommand(command.Push)
-	resp, err := a.srv.HandleRemoteCommand(c, common.NodeID(req.Target), remoteCmd, callback)
+	cmd := req.toCommand(command.Pull)
+	resp, err := a.srv.HandleCommandWithRemote(c, common.NodeID(req.Target), cmd)
 	if err != nil {
-		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("remote handle push command error: %v", err))
+		pgin.ReturnError(c, http.StatusInternalServerError, errors.Wrapf(err, "localCmd pull(%s -> %s)", req.Src, req.Dest))
 		return
 	}
 
@@ -54,23 +42,10 @@ func (a *RemoteXAPI) pullEntry(c *gin.Context, req *syncRequest) {
 }
 
 func (a *RemoteXAPI) pushEntry(c *gin.Context, req *syncRequest) {
-	var (
-		resp *command.Ret
-		err  error
-	)
-	callback := func(ctx context.Context, stream connection.Stream) error {
-		localCmd := req.toCommand(command.Push)
-		resp, err = a.srv.HandleCommand(ctx, localCmd, stream)
-		if err != nil {
-			return errors.Wrapf(err, "localCmd push(%s -> %s)", req.Src, req.Dest)
-		}
-		return nil
-	}
-
-	remoteCmd := req.toCommand(command.Pull)
-	_, err = a.srv.HandleRemoteCommand(c, common.NodeID(req.Target), remoteCmd, callback)
+	cmd := req.toCommand(command.Push)
+	resp, err := a.srv.HandleCommandWithRemote(c, common.NodeID(req.Target), cmd)
 	if err != nil {
-		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("remote handle pull command error: %v", err))
+		pgin.ReturnError(c, http.StatusInternalServerError, errors.Wrapf(err, "localCmd push(%s -> %s)", req.Src, req.Dest))
 		return
 	}
 
