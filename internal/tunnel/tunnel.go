@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/google/uuid"
@@ -68,37 +69,44 @@ func (m *TunnelManager) CreateTunnel(ctx context.Context, localAddr, remoteAddr 
 }
 
 func (m *TunnelManager) handleTunnel(ctx context.Context, tunnel *Tunnel) {
-	defer func() {
-		m.CloseTunnel(tunnel.TunnelKey)
-		plog.Debugc(ctx, "tunnel close")
-	}()
+	defer m.CloseTunnel(tunnel.TunnelKey)
 
 	for {
-		localConn, err := tunnel.listener.Accept()
-		if err != nil {
-			if ne, ok := err.(net.Error); ok && ne.Temporary() {
-				continue
-			}
-			plog.Errorc(ctx, "Failed to accept connection: %v", err)
+		select {
+		case <-ctx.Done():
+			plog.Debugc(ctx, "tunnel %s context canceled, closing tunnel", tunnel.TunnelKey)
 			return
-		}
-
-		stream, err := m.remoteEstablish(tunnel)
-		if err != nil {
-			plog.Errorc(ctx, "Failed to establish connection: %v", err)
-			continue
-		}
-
-		plog.Debugc(ctx, "establish remote connection success, start exchange data")
-
-		go func(conn net.Conn) {
-			defer conn.Close()
-			defer stream.Close()
-
-			if err := m.exchange(ctx, stream, conn); err != nil {
-				plog.Errorc(ctx, "Failed to exchange data: %v", err)
+		default:
+			if err := tunnel.listener.(*net.TCPListener).SetDeadline(time.Now().Add(time.Second)); err != nil {
+				plog.Errorc(ctx, "Failed to set accept deadline: %v", err)
+				return
 			}
-		}(localConn)
+
+			localConn, err := tunnel.listener.Accept()
+			if err != nil {
+				if ne, ok := err.(net.Error); ok && ne.Timeout() {
+					continue
+				}
+				plog.Errorc(ctx, "Failed to accept connection: %v", err)
+				return
+			}
+
+			go func(ctx context.Context, conn net.Conn) {
+				defer conn.Close()
+
+				stream, err := m.remoteEstablish(tunnel)
+				if err != nil {
+					plog.Errorc(ctx, "Failed to establish connection: %v", err)
+					return
+				}
+				defer stream.Close()
+				plog.Debugc(ctx, "establish remote connection success, start exchange data")
+
+				if err := m.exchange(ctx, stream, conn); err != nil {
+					plog.Errorc(ctx, "Failed to exchange data: %v", err)
+				}
+			}(ctx, localConn)
+		}
 	}
 }
 
@@ -171,17 +179,38 @@ func (m *TunnelManager) CloseTunnel(tunnelKey string) {
 	}
 }
 
+func (m *TunnelManager) copyWithContext(ctx context.Context, src io.Reader, dst io.Writer) error {
+	buf := make([]byte, 1024*16)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			l, err := src.Read(buf)
+			if l > 0 {
+				if _, we := dst.Write(buf[:l]); err != nil {
+					return we
+				}
+			}
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					return nil
+				}
+				return err
+			}
+		}
+	}
+}
+
 func (m *TunnelManager) exchange(ctx context.Context, dst, src io.ReadWriter) error {
 	eg, ctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		_, err := io.Copy(dst, src)
-		return err
+		return m.copyWithContext(ctx, dst, src)
 	})
 
 	eg.Go(func() error {
-		_, err := io.Copy(src, dst)
-		return err
+		return m.copyWithContext(ctx, src, dst)
 	})
 
 	return eg.Wait()
