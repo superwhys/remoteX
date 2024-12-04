@@ -9,22 +9,20 @@
 package api
 
 import (
-	"fmt"
-	"net/http"
-
 	"github.com/gin-gonic/gin"
-	"github.com/go-puzzles/puzzles/pgin"
+	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/pkg/common"
+	"github.com/superwhys/remoteX/server"
 )
 
-type TunnelRequest struct {
+type tunnelForward struct {
 	TargetNode string `json:"target_node" binding:"required"`
 	LocalAddr  string `json:"local_addr" binding:"required"`
 	RemoteAddr string `json:"remote_addr" binding:"required"`
 }
 
-func (tr *TunnelRequest) toCommand(t command.CommandType) *command.Command {
+func (tr *tunnelForward) toCommand(t command.CommandType) *command.Command {
 	return &command.Command{
 		Type: t,
 		Args: map[string]command.Command_Arg{
@@ -34,48 +32,42 @@ func (tr *TunnelRequest) toCommand(t command.CommandType) *command.Command {
 	}
 }
 
-type TunnelResponse struct {
-	Direction command.TunnelDirection `json:"direction"`
-	TunnelKey string                  `json:"tunnel_key" `
+func (t tunnelForward) Handle(c *gin.Context, srv *server.RemoteXServer) (resp *command.Ret, err error) {
+	resp, err = srv.HandleCommandInBackground(c, common.NodeID(t.TargetNode), t.toCommand(command.Forward))
+	if err != nil {
+		return nil, errors.Wrap(err, "tunnel forward")
+	}
+
+	return resp, nil
 }
 
-type CloseTunnelRequest struct {
+type listTunnel struct{}
+
+func (lt listTunnel) Handle(c *gin.Context, srv *server.RemoteXServer) (resp *command.Ret, err error) {
+	cmd := &command.Command{Type: command.Listtunnel}
+	resp, err = srv.HandleLocalCommand(c, cmd)
+	if err != nil {
+		return nil, errors.Wrap(err, "list tunnel")
+	}
+
+	return resp, nil
+}
+
+type closeTunnel struct {
 	TunnelKey string `json:"tunnel_key" binding:"required"`
 }
 
-func (a *RemoteXAPI) tunnelForward(c *gin.Context, req *TunnelRequest) {
-	resp, err := a.srv.HandleCommandInBackground(c, common.NodeID(req.TargetNode), req.toCommand(command.Forward))
-	if err != nil {
-		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("tunnel forward error: %v", err))
-		return
-	}
-
-	pgin.ReturnSuccess(c, resp)
-}
-
-func (a *RemoteXAPI) listTunnel(c *gin.Context) {
-	cmd := &command.Command{Type: command.Listtunnel}
-	resp, err := a.srv.HandleLocalCommand(c, cmd)
-	if err != nil {
-		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("tunnel reverse error: %v", err))
-		return
-	}
-
-	pgin.ReturnSuccess(c, resp)
-}
-
-func (a *RemoteXAPI) closeTunnel(ctx *gin.Context, req *CloseTunnelRequest) {
+func (ct closeTunnel) Handle(c *gin.Context, srv *server.RemoteXServer) (any, err error) {
 	cmd := &command.Command{
 		Type: command.Closetunnel,
 		Args: map[string]command.Command_Arg{
-			"tunnel_key": command.StrArg(req.TunnelKey),
+			"tunnel_key": command.StrArg(ct.TunnelKey),
 		},
 	}
-	_, err := a.srv.HandleLocalCommand(ctx, cmd)
+	_, err = srv.HandleLocalCommand(c, cmd)
 	if err != nil {
-		pgin.ReturnError(ctx, http.StatusInternalServerError, fmt.Sprintf("close tunnel error: %v", err))
-		return
+		return nil, errors.Wrap(err, "closeTunnel")
 	}
 
-	pgin.ReturnSuccess(ctx, nil)
+	return nil, nil
 }

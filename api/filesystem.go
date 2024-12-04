@@ -1,20 +1,18 @@
 package api
 
 import (
-	"fmt"
-	"net/http"
-
 	"github.com/gin-gonic/gin"
-	"github.com/go-puzzles/puzzles/pgin"
+	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/pkg/common"
+	"github.com/superwhys/remoteX/server"
 )
 
-type listDirReq struct {
+type listDir struct {
 	Path string `form:"path" binding:"required"`
 }
 
-func (l *listDirReq) toCommand(t command.CommandType) *command.Command {
+func (l *listDir) toCommand(t command.CommandType) *command.Command {
 	return &command.Command{
 		Type: t,
 		Args: map[string]command.Command_Arg{
@@ -23,15 +21,13 @@ func (l *listDirReq) toCommand(t command.CommandType) *command.Command {
 	}
 }
 
-func (a *RemoteXAPI) listDir(c *gin.Context, req *listDirReq) {
-	cmd := req.toCommand(command.Listdir)
-	ret, err := a.srv.HandleLocalCommand(c, cmd)
+func (a listDir) Handle(c *gin.Context, srv *server.RemoteXServer) (resp *command.Ret, err error) {
+	cmd := a.toCommand(command.Listdir)
+	ret, err := srv.HandleLocalCommand(c, cmd)
 	if err != nil {
-		pgin.ReturnError(c, http.StatusInternalServerError, err.Error())
-		return
+		return nil, err
 	}
-
-	pgin.ReturnSuccess(c, ret)
+	return ret, nil
 }
 
 type listRemoteDir struct {
@@ -39,22 +35,21 @@ type listRemoteDir struct {
 	Path   string `form:"path" binding:"required"`
 }
 
-func (l *listRemoteDir) toCommand(t command.CommandType) *command.Command {
+func (ld *listRemoteDir) toCommand(t command.CommandType) *command.Command {
 	return &command.Command{
 		Type: t,
 		Args: map[string]command.Command_Arg{
-			"path": command.StrArg(l.Path),
+			"path": command.StrArg(ld.Path),
 		},
 	}
 }
 
-func (a *RemoteXAPI) listRemoteDir(c *gin.Context, req *listRemoteDir) {
-	cmd := req.toCommand(command.Listdir)
-	resp, err := a.srv.HandleCommandWithRemote(c, common.NodeID(req.NodeId), cmd)
+func (ld listRemoteDir) Handle(c *gin.Context, srv *server.RemoteXServer) (resp *command.Ret, err error) {
+	cmd := ld.toCommand(command.Listdir)
+	resp, err = srv.HandleCommandWithRemote(c, common.NodeID(ld.NodeId), cmd)
 	if err != nil {
-		pgin.ReturnError(c, http.StatusInternalServerError, fmt.Sprintf("handle remote command error: %v", err))
-		return
+		return nil, errors.Wrap(err, "list remote dir")
 	}
 
-	pgin.ReturnSuccess(c, resp)
+	return resp, nil
 }

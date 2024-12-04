@@ -1,16 +1,14 @@
 package api
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
-	"github.com/go-puzzles/puzzles/pgin"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/pkg/common"
+	"github.com/superwhys/remoteX/server"
 )
 
-type syncRequest struct {
+type sync struct {
 	Target string `json:"target" binding:"required"`
 	Src    string `json:"src" binding:"required"`
 	Dest   string `json:"dest" binding:"required"`
@@ -18,7 +16,7 @@ type syncRequest struct {
 	Whole  bool   `json:"whole"`
 }
 
-func (p *syncRequest) toCommand(t command.CommandType) *command.Command {
+func (p *sync) toCommand(t command.CommandType) *command.Command {
 	return &command.Command{
 		Type: t,
 		Args: map[string]command.Command_Arg{
@@ -30,24 +28,30 @@ func (p *syncRequest) toCommand(t command.CommandType) *command.Command {
 	}
 }
 
-func (a *RemoteXAPI) pullEntry(c *gin.Context, req *syncRequest) {
-	cmd := req.toCommand(command.Pull)
-	resp, err := a.srv.HandleCommandWithRemote(c, common.NodeID(req.Target), cmd)
-	if err != nil {
-		pgin.ReturnError(c, http.StatusInternalServerError, errors.Wrapf(err, "localCmd pull(%s -> %s)", req.Src, req.Dest))
-		return
-	}
-
-	pgin.ReturnSuccess(c, resp)
+type syncPull struct {
+	sync
 }
 
-func (a *RemoteXAPI) pushEntry(c *gin.Context, req *syncRequest) {
-	cmd := req.toCommand(command.Push)
-	resp, err := a.srv.HandleCommandWithRemote(c, common.NodeID(req.Target), cmd)
+func (p syncPull) Handle(c *gin.Context, srv *server.RemoteXServer) (resp *command.Ret, err error) {
+	cmd := p.toCommand(command.Pull)
+	resp, err = srv.HandleCommandWithRemote(c, common.NodeID(p.Target), cmd)
 	if err != nil {
-		pgin.ReturnError(c, http.StatusInternalServerError, errors.Wrapf(err, "localCmd push(%s -> %s)", req.Src, req.Dest))
-		return
+		return nil, errors.Wrapf(err, "localCmd pull(%s -> %s)", p.Src, p.Dest)
 	}
 
-	pgin.ReturnSuccess(c, resp)
+	return resp, nil
+}
+
+type syncPush struct {
+	sync
+}
+
+func (p syncPush) Handle(c *gin.Context, srv *server.RemoteXServer) (resp *command.Ret, err error) {
+	cmd := p.toCommand(command.Push)
+	resp, err = srv.HandleCommandWithRemote(c, common.NodeID(p.Target), cmd)
+	if err != nil {
+		return nil, errors.Wrapf(err, "localCmd push(%s -> %s)", p.Src, p.Dest)
+	}
+
+	return resp, nil
 }

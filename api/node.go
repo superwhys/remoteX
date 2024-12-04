@@ -1,35 +1,31 @@
 package api
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
-	"github.com/go-puzzles/puzzles/pgin"
 	"github.com/superwhys/remoteX/pkg/common"
+	"github.com/superwhys/remoteX/server"
 )
 
-func (a *RemoteXAPI) getAllNodes() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		nodes, err := a.srv.NodeService.GetNodes()
-		if err != nil {
-			pgin.ReturnError(c, http.StatusBadRequest, err.Error())
-			return
-		}
+type getAllNodes struct{}
 
-		pgin.ReturnSuccess(c, NodesToDto(nodes))
+func (g getAllNodes) Handle(c *gin.Context, srv *server.RemoteXServer) (resp []*NodeDto, err error) {
+	nodes, err := srv.NodeService.GetNodes()
+	if err != nil {
+		return nil, err
 	}
+
+	return NodesToDto(nodes), nil
 }
 
 type getNode struct {
 	NodeId string `uri:"nodeId" binding:"required"`
 }
 
-func (a *RemoteXAPI) getNode(c *gin.Context, req *getNode) {
-	node, err := a.srv.NodeService.GetNode(common.NodeID(req.NodeId))
+func (a getNode) Handle(c *gin.Context, srv *server.RemoteXServer) (resp *NodeDto, err error) {
+	node, err := srv.NodeService.GetNode(common.NodeID(a.NodeId))
 	if err != nil {
-		pgin.ReturnError(c, http.StatusNotFound, err.Error())
-		return
+		return nil, err
 	}
 
-	pgin.ReturnSuccess(c, NodeToDto(node))
+	return NodeToDto(node), nil
 }

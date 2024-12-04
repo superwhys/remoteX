@@ -14,6 +14,8 @@ type RemoteOpt struct {
 }
 
 type Service interface {
+	// DoOriginCommand used to process a connection has not yet opened a stream
+	// it needs the task handler to open a stream itself
 	DoOriginCommand(ctx context.Context, cmd *Command, conn connection.StreamConnection) (*Ret, error)
 	DoAcceptCommand(ctx context.Context, cmd *Command, stream connection.Stream) (*Ret, error)
 	DoLocalCommand(ctx context.Context, cmd *Command) (*Ret, error)

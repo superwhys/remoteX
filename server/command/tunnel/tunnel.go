@@ -92,6 +92,9 @@ func (s *ServiceImpl) getStream(rw protoutils.ProtoMessageReadWriter) (connectio
 }
 
 func (s *ServiceImpl) Forward(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error) {
+	if opt.Conn == nil {
+		return nil, fmt.Errorf("connection is required")
+	}
 	tunnelArgs, err := s.ParseArgs(args)
 	if err != nil {
 		return nil, err

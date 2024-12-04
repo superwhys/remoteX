@@ -21,6 +21,7 @@ func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.Tl
 			stream, err := conn.AcceptStream()
 			if errorutils.IsRemoteDead(err) {
 				plog.Errorf("remote(%v) was down", conn.RemoteAddr())
+				// NOTE: Whether need to reconnect
 				// if server node was down, it will try to reconnect to server again
 				if !conn.IsServer() {
 					s.connectionRedial(conn.GetNodeId(), conn.GetDialURL())
