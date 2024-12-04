@@ -32,12 +32,9 @@ func (ne *NodeError) Error() string {
 	return ne.String()
 }
 
-type NodeNotFound struct {
-	*NodeError
-}
-
-func ErrNodeNotFound(nodeId common.NodeID) *NodeNotFound {
-	return &NodeNotFound{
-		NodeError: ErrNode(nodeId),
+func ErrNodeNotFound(nodeId common.NodeID) *NodeError {
+	return &NodeError{
+		BaseError: PackBaseError(WithMsg("node not found")),
+		nodeId:    nodeId,
 	}
 }

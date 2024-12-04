@@ -7,22 +7,40 @@ import (
 
 type BaseError struct {
 	error
-	Code    int
-	Message string
+	Code     uint64
+	Messages []string
 }
 
 type ErrOption func(connectionError *BaseError)
 
 func WithMsg(message string) ErrOption {
-	return func(connectionError *BaseError) {
-		connectionError.Message = message
+	return func(baseError *BaseError) {
+		if baseError.Messages == nil {
+			baseError.Messages = make([]string, 0)
+		}
+		baseError.Messages = append(baseError.Messages, message)
+	}
+}
+
+func WithCode(code uint64) ErrOption {
+	return func(baseError *BaseError) {
+		baseError.Code = code
 	}
 }
 
 func WithError(err error) ErrOption {
-	return func(connectionError *BaseError) {
-		connectionError.SetError(err)
+	return func(baseError *BaseError) {
+		baseError.SetError(err)
 	}
+}
+
+func PackBaseError(opts ...ErrOption) *BaseError {
+	e := new(BaseError)
+	for _, opt := range opts {
+		opt(e)
+	}
+
+	return e
 }
 
 func (e *BaseError) SetError(err error) {
@@ -34,29 +52,27 @@ func (e *BaseError) Error() string {
 	if e.Code != 0 {
 		final = append(final, fmt.Sprintf("Code: %d.", e.Code))
 	}
-	if e.Message != "" {
-		final = append(final, e.Message)
+	if len(e.Messages) != 0 {
+		final = append(final, strings.Join(e.Messages, ";"))
 	}
-	
+
 	if e.error != nil {
 		final = append(final, fmt.Sprintf("Error: %v.", e.error))
 	}
-	
+
 	return strings.Join(final, " ")
 }
 
-func PackBaseError(args ...any) *BaseError {
-	e := new(BaseError)
-	for _, arg := range args {
-		switch t := arg.(type) {
-		case error:
-			e.error = t
-		case int:
-			e.Code = t
-		case string:
-			e.Message = t
-		}
+func (e *BaseError) As(target any) bool {
+	if target == nil {
+		return false
 	}
-	
-	return e
+
+	switch t := target.(type) {
+	case *BaseError:
+		*t = *e
+		return true
+	default:
+		return false
+	}
 }
