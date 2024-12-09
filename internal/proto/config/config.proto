@@ -16,4 +16,5 @@ message Config {
   node.NodeTransConfiguration trans_conf = 3 [(ext.yaml) = "trans_conf", (ext.nullable) = true];
   repeated protocol.Address dial_clients = 4 [(ext.yaml) = "dial_clients", (ext.nullable) = true];
   int64 heartbeat_interval = 5 [(ext.yaml) = "heartbeat_interval"];
+  int64 max_dial_delay = 6 [(ext.yaml) = "max_dial_delay"];
 }

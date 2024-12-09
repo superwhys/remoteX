@@ -23,6 +23,10 @@ func (m *Config) SetDefault() {
 		m.TransConf.SetDefault()
 	}
 
+	if m.MaxDialDelay == 0 {
+		m.MaxDialDelay = 30
+	}
+
 	m.LocalNode.Address = address
 	m.LocalNode.Configuration = &node.NodeConfiguration{Transmission: m.TransConf}
 }

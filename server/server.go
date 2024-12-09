@@ -12,6 +12,7 @@ import (
 	"github.com/superwhys/remoteX/domain/node"
 	"github.com/superwhys/remoteX/internal/connection/dialer"
 	"github.com/superwhys/remoteX/internal/connection/listener"
+	"github.com/superwhys/remoteX/pkg/common"
 	"github.com/superwhys/remoteX/pkg/limiter"
 	"github.com/superwhys/remoteX/pkg/svcutils"
 	"github.com/superwhys/remoteX/pkg/tracker"
@@ -34,6 +35,7 @@ type RemoteXServer struct {
 
 	opt               *Option
 	heartbeatInterval time.Duration
+	maxDialDelay      time.Duration
 
 	dialTasks chan *connection.DialTask
 	// connections It is a channel used for transmitting successfully established connections
@@ -57,6 +59,7 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 		ConnService:       connSrv.NewConnectionService(local.URL(), opt.TlsConfig),
 		CommandService:    commandSrv.NewCommandService(),
 		heartbeatInterval: time.Second * time.Duration(opt.Conf.HeartbeatInterval),
+		maxDialDelay:      time.Second * time.Duration(opt.Conf.MaxDialDelay),
 		dialTasks:         make(chan *connection.DialTask),
 		connections:       make(chan connection.TlsConn),
 	}
@@ -74,9 +77,7 @@ func NewRemoteXServer(opt *Option) *RemoteXServer {
 func (s *RemoteXServer) startDialer(ctx context.Context) error {
 	go func() {
 		for _, client := range s.opt.Conf.DialClients {
-			s.dialTasks <- &connection.DialTask{
-				Target: client.URL(),
-			}
+			s.dialTasks <- connection.NewDialTask(client.URL(), common.NodeID(""), time.Second*2, s.maxDialDelay, false)
 		}
 	}()
 
@@ -97,11 +98,12 @@ func (s *RemoteXServer) startDialer(ctx context.Context) error {
 
 		conn, err := s.ConnService.EstablishConnection(ctx, task.Target)
 		if err != nil {
-			if !task.IsRedial {
-				return errors.Wrap(err, "failed to establish connection")
+			plog.Errorc(ctx, "establish connection failed: %v", err)
+
+			if task.NodeId != "" {
+				_ = s.NodeService.UpdateNodeStatus(task.NodeId, node.NodeStatusOffline)
 			}
-			_ = s.NodeService.UpdateNodeStatus(task.NodeId, node.NodeStatusOffline)
-			s.connectionRedial(task.NodeId, task.Target)
+			s.connectionRedialByTask(ctx, task)
 			continue
 		}
 
@@ -126,7 +128,10 @@ func (s *RemoteXServer) handleConnection(ctx context.Context) error {
 		}
 		if err != nil {
 			plog.Errorf("update/register remote node: %v error: %v", remote, err)
-			conn.Close()
+			s.CloseConnection(conn)
+			if !conn.IsServer() {
+				s.connectionRedial(ctx, conn.GetNodeId(), conn.GetDialURL())
+			}
 			continue
 		}
 		s.ConnService.RegisterConnection(conn)
@@ -159,7 +164,11 @@ func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn)
 
 	if err := eg.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		plog.Errorf("failed to run background connection: %v", err)
-		_ = s.NodeService.UpdateNodeStatus(conn.GetNodeId(), node.NodeStatusOffline)
 		s.CloseConnection(conn)
+		_ = s.NodeService.UpdateNodeStatus(conn.GetNodeId(), node.NodeStatusOffline)
+
+		if !conn.IsServer() {
+			s.connectionRedial(ctx, conn.GetNodeId(), conn.GetDialURL())
+		}
 	}
 }

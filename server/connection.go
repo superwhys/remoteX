@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 	"iter"
+	"math"
 	"net/url"
+	"time"
 
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/superwhys/remoteX/domain/connection"
@@ -27,14 +29,17 @@ func (s *RemoteXServer) connectionHandshakeIter(ctx context.Context) iter.Seq2[*
 
 			if err := s.ConnService.CheckConnection(conn); err != nil {
 				plog.Errorf("check connection err: %v", err)
-				conn.Close()
+				s.CloseConnection(conn)
 				continue
 			}
 
 			remote, err := s.connectionHandshake(conn)
 			if err != nil {
 				plog.Errorf("listen connection handshake err: %v", err)
-				conn.Close()
+				s.CloseConnection(conn)
+				if !conn.IsServer() {
+					s.connectionRedial(ctx, remote.NodeId, remote.URL())
+				}
 				continue
 			}
 
@@ -46,13 +51,42 @@ func (s *RemoteXServer) connectionHandshakeIter(ctx context.Context) iter.Seq2[*
 
 			if !yield(remote, conn) {
 				plog.Errorf("yield remoteNode and TlsConn error")
-				conn.Close()
+				s.CloseConnection(conn)
 				break
 			}
 		}
 	}
 }
 
-func (s *RemoteXServer) connectionRedial(nodeId common.NodeID, target *url.URL) {
-	// TODO: retry while server node was down
+// connectionRedial reconnects connections that have been established but were disconnected during operation
+func (s *RemoteXServer) connectionRedial(ctx context.Context, nodeId common.NodeID, target *url.URL) {
+	s.connectionRedialByTask(ctx, connection.NewDialTask(target, nodeId, time.Second*2, s.maxDialDelay, true))
+}
+
+// connectionRedialByTask reconnects the DialTask that is currently failed and sets the connection count to +1,
+// which is used for reconnection when the connection task fails
+func (s *RemoteXServer) connectionRedialByTask(ctx context.Context, task *connection.DialTask) {
+	task.DialCnt++
+	task.IsRedial = true
+
+	var delay time.Duration
+	attempt := task.DialCnt
+	if attempt >= task.Threshold {
+		delay = task.MaxDelay
+	} else {
+		delay = time.Duration(math.Min(
+			float64(task.MaxDelay),
+			float64(task.InitDelay)*math.Pow(2, float64(attempt)),
+		))
+	}
+	plog.Errorc(ctx, "Attempt %d failed, retrying in %v...", attempt+1, delay)
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(delay):
+			s.dialTasks <- task
+		}
+	}()
 }

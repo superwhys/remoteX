@@ -3,6 +3,7 @@ package connection
 import (
 	"crypto/tls"
 	"io"
+	math "math"
 	"net"
 	"net/url"
 	"time"
@@ -265,7 +266,27 @@ func (cc *CounterStream) Close() error {
 }
 
 type DialTask struct {
-	Target   *url.URL
-	NodeId   common.NodeID
-	IsRedial bool
+	Target *url.URL
+	NodeId common.NodeID
+
+	DialCnt   int
+	Threshold int
+	InitDelay time.Duration
+	MaxDelay  time.Duration
+	IsRedial  bool
+}
+
+func calculateThreshold(initialDelay, maxDelay time.Duration) int {
+	return int(math.Log2(float64(maxDelay) / float64(initialDelay)))
+}
+
+func NewDialTask(target *url.URL, nodeId common.NodeID, initDelay, maxDelay time.Duration, isRedial bool) *DialTask {
+	return &DialTask{
+		Target:    target,
+		NodeId:    nodeId,
+		InitDelay: initDelay,
+		MaxDelay:  maxDelay,
+		Threshold: calculateThreshold(initDelay, maxDelay),
+		IsRedial:  isRedial,
+	}
 }
