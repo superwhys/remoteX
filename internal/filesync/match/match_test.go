@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
 	"github.com/superwhys/remoteX/internal/filesystem"
@@ -42,7 +43,7 @@ func tempFileCreate(size int) (string, error) {
 func copyFile(src, dst string) error {
 	sourceFile, err := os.Open(src)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "openFile(%s)", src)
 	}
 	defer sourceFile.Close()
 
@@ -94,6 +95,10 @@ func randomAddBytes(f string, fileSize int64) error {
 func TestFileHashMatch(t *testing.T) {
 	fileSize := 1024 * 1024 * 50
 	source, err := tempFileCreate(fileSize)
+	if !assert.Nil(t, err) {
+		return
+	}
+
 	fileName := filepath.Base(source)
 	target := filepath.Join(filepath.Dir(source), "sync"+fileName)
 	err = copyFile(source, target)
