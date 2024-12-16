@@ -18,6 +18,7 @@ func SendFiles(ctx context.Context, rw protoutils.ProtoMessageReadWriter, path s
 	opts = opts.SetDefault()
 
 	st := &sender.SendTransfer{
+		Fs:   filesystem.NewBasicFileSystem(),
 		Opts: opts,
 		Rw:   rw,
 	}
@@ -49,7 +50,7 @@ func SendFiles(ctx context.Context, rw protoutils.ProtoMessageReadWriter, path s
 		if err != nil {
 			return nil, errors.Wrap(err, "receiveFileIdx")
 		}
-		if fileIdx.GetIdx() == -1 || fileIdx.GetIdx() == 0 || int(fileIdx.GetIdx()) > fileCnt {
+		if fileIdx.GetIdx() <= 0 || int(fileIdx.GetIdx()) > fileCnt {
 			break
 		}
 
@@ -109,6 +110,7 @@ func ReceiveFile(ctx context.Context, rw protoutils.ProtoMessageReadWriter, dest
 	opts = opts.SetDefault()
 
 	rt := &receiver.ReceiveTransfer{
+		Fs:   filesystem.NewBasicFileSystem(),
 		Opts: opts,
 		Dest: dest,
 		Rw:   rw,
@@ -141,6 +143,7 @@ func ReceiveFile(ctx context.Context, rw protoutils.ProtoMessageReadWriter, dest
 		}
 
 		if f.Entry.Type == filesystem.EntryTypeDir {
+			// TODO: create dir if not exsits
 			continue
 		}
 

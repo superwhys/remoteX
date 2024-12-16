@@ -13,7 +13,7 @@ import (
 
 // HashMatch is used to compare the HashHead transmitted from the client
 // with the source file from the server
-func HashMatch(ctx context.Context, head *pb.HashHead, srcFile *filesystem.File) (matchIter iter.Seq2[*pb.FileChunk, error], err error) {
+func HashMatch(ctx context.Context, head *pb.HashHead, srcFile filesystem.File) (matchIter iter.Seq2[*pb.FileChunk, error], err error) {
 	var (
 		buf         []byte
 		fileSize    int64
@@ -23,7 +23,7 @@ func HashMatch(ctx context.Context, head *pb.HashHead, srcFile *filesystem.File)
 
 		hashHits     int
 		hashs        = head.GetHashs()
-		hashMap      = GetHashMap(head)
+		hashMap      = getHashMap(head)
 		notMatchData = make([]byte, 0, head.GetBlockLength())
 	)
 
@@ -44,7 +44,7 @@ func HashMatch(ctx context.Context, head *pb.HashHead, srcFile *filesystem.File)
 		fileSize = fi.Size()
 
 		// read the first pb.FileChunk with offset: 0
-		if buf, sum, blockLength, err = ReadFileBuf(srcFile, fileSize, offset, head); err != nil {
+		if buf, sum, blockLength, err = readFileBuf(srcFile, fileSize, offset, head); err != nil {
 			yield(nil, err)
 			return
 		}
@@ -91,7 +91,7 @@ func HashMatch(ctx context.Context, head *pb.HashHead, srcFile *filesystem.File)
 						break Outer
 					}
 
-					if buf, sum, blockLength, err = ReadFileBuf(srcFile, fileSize, offset, head); err != nil {
+					if buf, sum, blockLength, err = readFileBuf(srcFile, fileSize, offset, head); err != nil {
 						yield(nil, err)
 						return
 					}
@@ -112,7 +112,7 @@ func HashMatch(ctx context.Context, head *pb.HashHead, srcFile *filesystem.File)
 			if remaining := fileSize - offset; remaining < l {
 				l = remaining
 			}
-			buf, err = filesystem.BasicFs.ReadFileAtOffset(srcFile, offset, l)
+			buf, err = srcFile.ReadFileAtOffset(offset, l)
 			if err != nil {
 				yield(nil, errors.Wrapf(err, "ReadFileAtOffset(%v-%v)", offset, l))
 				return
@@ -125,7 +125,7 @@ func HashMatch(ctx context.Context, head *pb.HashHead, srcFile *filesystem.File)
 	return matchIter, nil
 }
 
-func GetHashMap(head *pb.HashHead) map[uint32]int64 {
+func getHashMap(head *pb.HashHead) map[uint32]int64 {
 	hashMap := make(map[uint32]int64)
 	for _, sum := range head.GetHashs() {
 		hashMap[sum.GetSum1()] = sum.GetIndex()
@@ -133,13 +133,13 @@ func GetHashMap(head *pb.HashHead) map[uint32]int64 {
 	return hashMap
 }
 
-func ReadFileBuf(f *filesystem.File, fileSize, offset int64, head *pb.HashHead) (buf []byte, sum uint32, blockLength int64, err error) {
+func readFileBuf(f filesystem.File, fileSize, offset int64, head *pb.HashHead) (buf []byte, sum uint32, blockLength int64, err error) {
 	blockLength = head.GetBlockLength()
 	if remaining := fileSize - offset; remaining < blockLength {
 		blockLength = remaining
 	}
 
-	buf, err = filesystem.BasicFs.ReadFileAtOffset(f, offset, blockLength)
+	buf, err = f.ReadFileAtOffset(offset, blockLength)
 	if err != nil {
 		return nil, 0, 0, errors.Wrapf(err, "ReadFileAtOffset(%v-%v)", offset, blockLength)
 	}

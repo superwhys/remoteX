@@ -2,21 +2,24 @@ package receiver
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"iter"
 	"os"
 	"path/filepath"
 
+	"github.com/go-puzzles/puzzles/plog"
 	"github.com/go-puzzles/puzzles/putils"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/internal/filesync/common"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
-	"github.com/superwhys/remoteX/internal/filesync/match"
 	"github.com/superwhys/remoteX/internal/filesync/pb"
 	"github.com/superwhys/remoteX/internal/filesystem"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
 type ReceiveTransfer struct {
+	Fs        filesystem.FileSystem
 	Opts      *pb.SyncOpts
 	Dest      string
 	DestIsDir bool
@@ -133,7 +136,7 @@ func (rt *ReceiveTransfer) CalcFileHashAndSend(ctx context.Context, local string
 		})
 	}
 
-	in, err := filesystem.BasicFs.OpenFile(local)
+	in, err := rt.Fs.OpenFile(local)
 	if err != nil {
 		return errors.Wrapf(err, "openFile: %s", local)
 	}
@@ -163,7 +166,7 @@ func (rt *ReceiveTransfer) CalcFileHashAndSend(ctx context.Context, local string
 	return nil
 }
 
-func (rt *ReceiveTransfer) receiveFileChunkIter(ctx context.Context) (matchIter iter.Seq2[*pb.FileChunk, error]) {
+func (rt *ReceiveTransfer) receiveFileChunkIter(ctx context.Context) (fileChunkIter iter.Seq2[*pb.FileChunk, error]) {
 	return func(yield func(*pb.FileChunk, error) bool) {
 		for {
 			var fileChunk pb.FileChunk
@@ -187,16 +190,86 @@ func (rt *ReceiveTransfer) receiveFileChunkIter(ctx context.Context) (matchIter 
 }
 
 func (rt *ReceiveTransfer) TransferFile(ctx context.Context, targetPath string) (err error) {
-	var target *filesystem.File
+	var target filesystem.File
 	if !putils.FileExists(targetPath) {
-		target, err = filesystem.BasicFs.CreateFile(targetPath)
+		target, err = rt.Fs.CreateFile(targetPath)
 	} else {
-		target, err = filesystem.BasicFs.OpenFile(targetPath)
+		target, err = rt.Fs.OpenFile(targetPath)
 	}
 	if err != nil {
 		return errors.Wrap(err, "openFile")
 	}
 
-	matchIter := rt.receiveFileChunkIter(ctx)
-	return match.SyncFile(ctx, matchIter, target)
+	fileChunkIter := rt.receiveFileChunkIter(ctx)
+	return rt.syncFile(ctx, fileChunkIter, target)
+}
+
+func (rt *ReceiveTransfer) syncFileToWriter(ctx context.Context, fileChunkIter iter.Seq2[*pb.FileChunk, error], target filesystem.File, writer io.Writer) error {
+	for fileChunk, err := range fileChunkIter {
+		if err != nil {
+			return errors.Wrap(err, "iter file match")
+		}
+
+		var data []byte
+		if fileChunk.GetHash() != nil {
+			offset := fileChunk.Hash.GetOffset()
+			data, err = target.ReadFileAtOffset(offset, fileChunk.Hash.GetLen())
+			if err != nil {
+				return errors.Wrap(err, "read file at offset")
+			}
+		} else {
+			data = fileChunk.GetData()
+		}
+
+		_, err := writer.Write(data)
+		if err != nil {
+			return errors.Wrap(err, "write to Writer")
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+	}
+
+	return nil
+}
+
+func (rt *ReceiveTransfer) syncFile(ctx context.Context, fileChunkIter iter.Seq2[*pb.FileChunk, error], target filesystem.File) (err error) {
+	path := target.Name()
+	baseName := filepath.Base(path)
+	tmpPath := filepath.Join(filepath.Dir(path), fmt.Sprintf("tmp-%s", baseName))
+	tmpFile, err := rt.Fs.CreateFile(tmpPath)
+	if err != nil {
+		return errors.Wrap(err, "create tmp file")
+	}
+	defer func() {
+		if err != nil {
+			tmpFile.Close()
+			os.Remove(tmpPath)
+			return
+		}
+		tmpFile.Close()
+		target.Close()
+
+		if err := os.Rename(tmpPath, path); err != nil {
+			plog.Errorf("rename tmp file to target file: %v", err)
+			return
+		}
+
+		f, err := rt.Fs.OpenFile(path)
+		if err != nil {
+			plog.Errorf("open target file after rename: %v", err)
+			return
+		}
+		target.Update(f)
+	}()
+
+	err = rt.syncFileToWriter(ctx, fileChunkIter, target, tmpFile)
+	if err != nil {
+		return errors.Wrap(err, "sync file to Writer")
+	}
+
+	return nil
 }

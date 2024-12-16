@@ -17,6 +17,7 @@ import (
 )
 
 type SendTransfer struct {
+	Fs         filesystem.FileSystem
 	Opts       *pb.SyncOpts
 	Rw         protoutils.ProtoMessageReadWriter
 	ActualSend int
@@ -106,7 +107,7 @@ func (st *SendTransfer) SendFile(ctx context.Context, fileSize int64, srcPath st
 		}
 	}()
 
-	srcFile, err := filesystem.BasicFs.OpenFile(srcPath)
+	srcFile, err := st.Fs.OpenFile(srcPath)
 	if err != nil {
 		return errors.Wrapf(err, "open file: %s", srcPath)
 	}
@@ -153,7 +154,7 @@ func (st *SendTransfer) HashMatch(ctx context.Context, head *pb.HashHead, srcPat
 		}
 	}()
 
-	srcFile, err := filesystem.BasicFs.OpenFile(srcPath)
+	srcFile, err := st.Fs.OpenFile(srcPath)
 	if err != nil {
 		return errors.Wrapf(err, "open file: %s", srcPath)
 	}
@@ -189,7 +190,7 @@ func (st *SendTransfer) GetFileList(root string) iter.Seq[*pb.FileBase] {
 	}
 
 	return func(yield func(*pb.FileBase) bool) {
-		walkIter, err := filesystem.BasicFs.WalkIter(root, filter)
+		walkIter, err := st.Fs.WalkIter(root, filter)
 		if err != nil {
 			plog.Errorf("WalkIter error: %v", err)
 			return

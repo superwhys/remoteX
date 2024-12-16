@@ -68,7 +68,7 @@ func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, opt *com
 	}
 }
 
-func (s *ServiceImpl) tellRemote(remoteType command.CommandType, currentArgs command.Args, stream connection.Stream) error {
+func (s *ServiceImpl) tellRemoteTo(remoteType command.CommandType, currentArgs command.Args, stream connection.Stream) error {
 	remoteCmd := &command.Command{
 		Type: remoteType,
 		Args: currentArgs,
@@ -95,7 +95,7 @@ func (s *ServiceImpl) Push(ctx context.Context, args command.Args, opt *command.
 		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
 	}
 
-	err = s.tellRemote(command.Pull, args, stream)
+	err = s.tellRemoteTo(command.Pull, args, stream)
 	if err != nil {
 		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
 	}
@@ -122,7 +122,7 @@ func (s *ServiceImpl) Pull(ctx context.Context, args command.Args, opt *command.
 		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
 	}
 
-	err = s.tellRemote(command.Push, args, stream)
+	err = s.tellRemoteTo(command.Push, args, stream)
 	if err != nil {
 		return nil, errorutils.ErrCommand(int32(command.Pull), args, errorutils.WithError(err))
 	}
