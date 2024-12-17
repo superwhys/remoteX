@@ -66,7 +66,6 @@ func (s *RemoteXServer) connectionRedial(ctx context.Context, nodeId common.Node
 // connectionRedialByTask reconnects the DialTask that is currently failed and sets the connection count to +1,
 // which is used for reconnection when the connection task fails
 func (s *RemoteXServer) connectionRedialByTask(ctx context.Context, task *connection.DialTask) {
-	task.DialCnt++
 	task.IsRedial = true
 
 	var delay time.Duration
@@ -84,8 +83,11 @@ func (s *RemoteXServer) connectionRedialByTask(ctx context.Context, task *connec
 	go func() {
 		select {
 		case <-ctx.Done():
+			plog.Warnc(ctx, "redial context done")
 			return
 		case <-time.After(delay):
+			plog.Debugc(ctx, "redial")
+			task.DialCnt++
 			s.dialTasks <- task
 		}
 	}()

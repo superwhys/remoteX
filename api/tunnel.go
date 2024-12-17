@@ -9,6 +9,8 @@
 package api
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
@@ -33,7 +35,7 @@ func (tr *tunnelForward) toCommand(t command.CommandType) *command.Command {
 }
 
 func (t tunnelForward) Handle(c *gin.Context, srv *server.RemoteXServer) (resp *command.Ret, err error) {
-	resp, err = srv.HandleCommandInBackground(c, common.NodeID(t.TargetNode), t.toCommand(command.Forward))
+	resp, err = srv.HandleCommandWithRawRemote(context.TODO(), common.NodeID(t.TargetNode), t.toCommand(command.Forward))
 	if err != nil {
 		return nil, errors.Wrap(err, "tunnel forward")
 	}

@@ -21,10 +21,6 @@ func (s *RemoteXServer) schedulerCommand(ctx context.Context, conn connection.Tl
 			stream, err := conn.AcceptStream()
 			if errorutils.IsRemoteDead(err) {
 				plog.Errorf("remote(%v) was down", conn.RemoteAddr())
-				// if server node was down, it will try to reconnect to server again
-				if !conn.IsServer() {
-					s.connectionRedial(ctx, conn.GetNodeId(), conn.GetDialURL())
-				}
 				return err
 			} else if err != nil {
 				continue
@@ -46,9 +42,10 @@ func (s *RemoteXServer) receiveAndHandleCommand(ctx context.Context, stream conn
 		return errors.Wrap(err, "receiveCommand")
 	}
 
-	plog.Debugf("received command: %v", cmd)
+	plog.Debugc(ctx, "received command: %v", cmd)
+	defer plog.Debugc(ctx, "received command: %v done", cmd)
 
-	resp, err := s.CommandService.DoAcceptCommand(ctx, cmd, stream)
+	resp, err := s.CommandService.Execute(ctx, cmd, &command.CommandContext{Remote: stream})
 	if err != nil {
 		return stream.WriteMessage(&command.Ret{ErrMsg: fmt.Sprintf("handle command failed: %v", err)})
 	}
@@ -57,38 +54,7 @@ func (s *RemoteXServer) receiveAndHandleCommand(ctx context.Context, stream conn
 }
 
 func (s *RemoteXServer) HandleLocalCommand(ctx context.Context, cmd *command.Command) (resp *command.Ret, err error) {
-	return s.CommandService.DoLocalCommand(ctx, cmd)
-}
-
-func (s *RemoteXServer) SendCommandToRemote(ctx context.Context, nodeId common.NodeID, cmd *command.Command) (resp *command.Ret, err error) {
-	remoteNode, err := s.NodeService.GetNode(nodeId)
-	if err != nil {
-		return nil, errors.Wrap(err, "getNode")
-	}
-
-	connId := remoteNode.GetConnectionId()
-
-	conn, err := s.ConnService.GetConnection(connId)
-	if err != nil {
-		return nil, errors.Wrap(err, "getConnection")
-	}
-
-	stream, err := conn.OpenStream()
-	if err != nil {
-		return nil, errors.Wrap(err, "openStream")
-	}
-	defer stream.Close()
-
-	if err := stream.WriteMessage(cmd); err != nil {
-		return nil, errors.Wrap(err, "sendCommand")
-	}
-
-	resp = new(command.Ret)
-	if err = stream.ReadMessage(resp); err != nil {
-		return nil, errors.Wrap(err, "readRespMessage")
-	}
-
-	return resp, nil
+	return s.CommandService.Execute(ctx, cmd, &command.CommandContext{})
 }
 
 func (s *RemoteXServer) HandleCommandWithRemote(ctx context.Context, nodeId common.NodeID, cmd *command.Command) (resp *command.Ret, err error) {
@@ -110,10 +76,13 @@ func (s *RemoteXServer) HandleCommandWithRemote(ctx context.Context, nodeId comm
 	}
 	defer stream.Close()
 
-	return s.CommandService.DoAcceptCommand(ctx, cmd, stream)
+	return s.CommandService.Execute(ctx, cmd, &command.CommandContext{
+		IsRemote: true,
+		Remote:   stream,
+	})
 }
 
-func (s *RemoteXServer) HandleCommandInBackground(ctx context.Context, nodeId common.NodeID, cmd *command.Command) (resp *command.Ret, err error) {
+func (s *RemoteXServer) HandleCommandWithRawRemote(ctx context.Context, nodeId common.NodeID, cmd *command.Command) (resp *command.Ret, err error) {
 	remoteNode, err := s.NodeService.GetNode(nodeId)
 	if err != nil {
 		return nil, errors.Wrap(err, "getNode")
@@ -126,5 +95,8 @@ func (s *RemoteXServer) HandleCommandInBackground(ctx context.Context, nodeId co
 		return nil, errors.Wrap(err, "getConnection")
 	}
 
-	return s.CommandService.DoOriginCommand(ctx, cmd, conn)
+	return s.CommandService.Execute(ctx, cmd, &command.CommandContext{
+		IsRemote:  true,
+		RawRemote: conn,
+	})
 }

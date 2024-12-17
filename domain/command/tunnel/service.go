@@ -12,12 +12,13 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/superwhys/remoteX/domain/command"
+	"github.com/superwhys/remoteX/domain/connection"
 )
 
 type Service interface {
 	command.CommandProvider
-	Forward(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error)
-	ReceiveForward(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error)
-	ListTunnel(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error)
-	CloseTunnel(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error)
+	Forward(ctx context.Context, args command.Args, conn connection.StreamConnection) (proto.Message, error)
+	ReceiveForward(ctx context.Context, args command.Args, stream connection.Stream) (proto.Message, error)
+	ListTunnel(ctx context.Context, args command.Args) (proto.Message, error)
+	CloseTunnel(ctx context.Context, args command.Args) (proto.Message, error)
 }

@@ -142,8 +142,8 @@ func (s *RemoteXServer) handleConnection(ctx context.Context) error {
 	return nil
 }
 
-func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn) {
-	eg, ctx := errgroup.WithContext(ctx)
+func (s *RemoteXServer) background(c context.Context, conn connection.TlsConn) {
+	eg, ctx := errgroup.WithContext(c)
 
 	hbStartNotify := make(chan struct{})
 
@@ -168,7 +168,7 @@ func (s *RemoteXServer) background(ctx context.Context, conn connection.TlsConn)
 		_ = s.NodeService.UpdateNodeStatus(conn.GetNodeId(), node.NodeStatusOffline)
 
 		if !conn.IsServer() {
-			s.connectionRedial(ctx, conn.GetNodeId(), conn.GetDialURL())
+			s.connectionRedial(c, conn.GetNodeId(), conn.GetDialURL())
 		}
 	}
 }

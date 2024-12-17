@@ -16,10 +16,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/domain/command/sync"
-	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/internal/filesync"
 	"github.com/superwhys/remoteX/internal/filesync/pb"
 	"github.com/superwhys/remoteX/pkg/errorutils"
+	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
 var _ sync.Service = (*ServiceImpl)(nil)
@@ -32,6 +32,14 @@ func NewSyncService() *ServiceImpl {
 	return &ServiceImpl{
 		filesyncer: filesync.NewFileSyncer(),
 	}
+}
+
+func (s *ServiceImpl) Name() string {
+	return "sync"
+}
+
+func (s *ServiceImpl) SupportedCommands() []command.CommandType {
+	return []command.CommandType{command.Push, command.Pull}
 }
 
 func (s *ServiceImpl) ParseArgs(args command.Args) (opts *pb.SyncOpts, err error) {
@@ -60,31 +68,48 @@ func (s *ServiceImpl) ParseArgs(args command.Args) (opts *pb.SyncOpts, err error
 	return nil, ea
 }
 
-func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, opt *command.RemoteOpt) (proto.Message, error) {
+func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, cmdCtx *command.CommandContext) (proto.Message, error) {
+	if cmdCtx.IsRemote {
+		err := s.tellRemoteTo(cmd, cmdCtx.Remote)
+		if err != nil {
+			return nil, errors.Wrap(err, "tellRemoteTo")
+		}
+	}
+
 	switch cmd.Type {
 	case command.Push:
-		return s.Push(ctx, cmd.Args, opt)
+		return s.Push(ctx, cmd.Args, cmdCtx.Remote)
 	case command.Pull:
-		return s.Pull(ctx, cmd.Args, opt)
+		return s.Pull(ctx, cmd.Args, cmdCtx.Remote)
 	default:
 		return nil, errorutils.ErrNotSupportCommandType(int32(cmd.Type))
 	}
 }
 
-func (s *ServiceImpl) tellRemoteTo(remoteType command.CommandType, currentArgs command.Args, stream connection.Stream) error {
-	remoteCmd := &command.Command{
-		Type: remoteType,
-		Args: currentArgs,
+func (s *ServiceImpl) tellRemoteTo(cmd *command.Command, rw protoutils.ProtoMessageReadWriter) error {
+	var remoteCmdType command.CommandType
+	switch cmd.GetType() {
+	case command.Push:
+		remoteCmdType = command.Pull
+	case command.Pull:
+		remoteCmdType = command.Push
+	default:
+		return errorutils.ErrNotSupportCommandType(int32(cmd.GetType()))
 	}
 
-	if err := stream.WriteMessage(remoteCmd); err != nil {
+	remoteCmd := &command.Command{
+		Type: remoteCmdType,
+		Args: cmd.GetArgs(),
+	}
+
+	if err := rw.WriteMessage(remoteCmd); err != nil {
 		return errors.Wrap(err, "sendCommand")
 	}
 
 	return nil
 }
 
-func (s *ServiceImpl) Push(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error) {
+func (s *ServiceImpl) Push(ctx context.Context, args command.Args, rw protoutils.ProtoMessageReadWriter) (proto.Message, error) {
 	opts, err := s.ParseArgs(args)
 	if err != nil {
 		return nil, err
@@ -93,17 +118,7 @@ func (s *ServiceImpl) Push(ctx context.Context, args command.Args, opt *command.
 		return nil, errorutils.ErrCommandMissingArguments(int32(command.Push), args)
 	}
 
-	stream, err := opt.Conn.OpenStream()
-	if err != nil {
-		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
-	}
-
-	err = s.tellRemoteTo(command.Pull, args, stream)
-	if err != nil {
-		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
-	}
-
-	resp, err := s.filesyncer.SendFiles(ctx, stream, opts.Path, opts)
+	resp, err := s.filesyncer.SendFiles(ctx, rw, opts.Path, opts)
 	if err != nil {
 		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
 	}
@@ -111,7 +126,7 @@ func (s *ServiceImpl) Push(ctx context.Context, args command.Args, opt *command.
 	return resp, nil
 }
 
-func (s *ServiceImpl) Pull(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error) {
+func (s *ServiceImpl) Pull(ctx context.Context, args command.Args, rw protoutils.ProtoMessageReadWriter) (proto.Message, error) {
 	opts, err := s.ParseArgs(args)
 	if err != nil {
 		return nil, err
@@ -120,17 +135,7 @@ func (s *ServiceImpl) Pull(ctx context.Context, args command.Args, opt *command.
 		return nil, errorutils.ErrCommandMissingArguments(int32(command.Pull), args)
 	}
 
-	stream, err := opt.Conn.OpenStream()
-	if err != nil {
-		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
-	}
-
-	err = s.tellRemoteTo(command.Push, args, stream)
-	if err != nil {
-		return nil, errorutils.ErrCommand(int32(command.Pull), args, errorutils.WithError(err))
-	}
-
-	resp, err := s.filesyncer.ReceiveFiles(ctx, stream, opts.Dest, opts)
+	resp, err := s.filesyncer.ReceiveFiles(ctx, rw, opts.Dest, opts)
 	if err != nil {
 		return nil, errorutils.ErrCommand(int32(command.Pull), args, errorutils.WithError(err))
 	}

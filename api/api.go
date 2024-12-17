@@ -56,8 +56,8 @@ func (a *RemoteXAPI) SetupHttpServer() *gin.Engine {
 	router.POST("/sync/pull", MountApiService[syncPull](a.srv))
 	router.POST("/sync/push", MountApiService[syncPush](a.srv))
 	router.POST("/tunnel/forward", MountApiService[tunnelForward](a.srv))
-	router.POST("/tunnel/close", MountApiService[closeTunnel](a.srv))
 	router.GET("/tunnel/list", MountApiService[listTunnel](a.srv))
+	router.POST("/tunnel/close", MountApiService[closeTunnel](a.srv))
 
 	// nodeRouter is used to handle remote commands
 	nodeRouter := router.Group("/node/:nodeId")

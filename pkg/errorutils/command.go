@@ -1,6 +1,8 @@
 package errorutils
 
-import "github.com/superwhys/remoteX/domain/command"
+import (
+	"github.com/superwhys/remoteX/domain/command"
+)
 
 type CommandError struct {
 	*BaseError

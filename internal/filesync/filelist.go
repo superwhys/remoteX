@@ -25,12 +25,7 @@ import (
 
 func (f *fileSyncer) getFileList(strip, root string) iter.Seq[*pb.FileBase] {
 	filter := func(path string, info fs.FileInfo) bool {
-		if path == root && info.IsDir() {
-			return false
-		}
-
-		info.Mode().IsRegular()
-		return true
+		return info.IsDir() || info.Mode().IsRegular()
 	}
 
 	return func(yield func(*pb.FileBase) bool) {

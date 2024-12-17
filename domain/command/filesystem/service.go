@@ -9,5 +9,5 @@ import (
 
 type Service interface {
 	command.CommandProvider
-	ListDir(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error)
+	ListDir(ctx context.Context, args command.Args) (proto.Message, error)
 }

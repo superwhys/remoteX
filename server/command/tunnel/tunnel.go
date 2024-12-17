@@ -23,8 +23,6 @@ import (
 	tunnelClient "github.com/superwhys/remoteX/internal/tunnel"
 )
 
-var _ tunnel.Service = (*ServiceImpl)(nil)
-
 type ServiceImpl struct {
 	tunnelClient *tunnelClient.TunnelManager
 }
@@ -40,16 +38,29 @@ func NewTunnelService() tunnel.Service {
 	}
 }
 
-func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, opt *command.RemoteOpt) (proto.Message, error) {
+func (s *ServiceImpl) Name() string {
+	return "tunnel"
+}
+
+func (s *ServiceImpl) SupportedCommands() []command.CommandType {
+	return []command.CommandType{
+		command.Forward,
+		command.Forwardreceive,
+		command.Listtunnel,
+		command.Closetunnel,
+	}
+}
+
+func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, cmdCtx *command.CommandContext) (proto.Message, error) {
 	switch cmd.Type {
 	case command.Forward:
-		return s.Forward(ctx, cmd.GetArgs(), opt)
+		return s.Forward(ctx, cmd.GetArgs(), cmdCtx.RawRemote)
 	case command.Forwardreceive:
-		return s.ReceiveForward(ctx, cmd.GetArgs(), opt)
+		return s.ReceiveForward(ctx, cmd.GetArgs(), cmdCtx.Remote)
 	case command.Listtunnel:
-		return s.ListTunnel(ctx, cmd.GetArgs(), opt)
+		return s.ListTunnel(ctx, cmd.GetArgs())
 	case command.Closetunnel:
-		return s.CloseTunnel(ctx, cmd.GetArgs(), opt)
+		return s.CloseTunnel(ctx, cmd.GetArgs())
 	default:
 		return nil, errorutils.ErrNotSupportCommandType(int32(cmd.Type))
 	}
@@ -91,10 +102,7 @@ func (s *ServiceImpl) getStream(rw protoutils.ProtoMessageReadWriter) (connectio
 	return stream, nil
 }
 
-func (s *ServiceImpl) Forward(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error) {
-	if opt.Conn == nil {
-		return nil, fmt.Errorf("connection is required")
-	}
+func (s *ServiceImpl) Forward(ctx context.Context, args command.Args, conn connection.StreamConnection) (proto.Message, error) {
 	tunnelArgs, err := s.ParseArgs(args)
 	if err != nil {
 		return nil, err
@@ -105,7 +113,7 @@ func (s *ServiceImpl) Forward(ctx context.Context, args command.Args, opt *comma
 	}
 
 	ctx = plog.With(ctx, "forward")
-	tunnel, err := s.tunnelClient.CreateTunnel(ctx, tunnelArgs.localAddr, tunnelArgs.remoteAddr, opt.Conn)
+	tunnel, err := s.tunnelClient.CreateTunnel(ctx, tunnelArgs.localAddr, tunnelArgs.remoteAddr, conn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create forward tunnel: %v", err)
 	}
@@ -118,7 +126,7 @@ func (s *ServiceImpl) Forward(ctx context.Context, args command.Args, opt *comma
 	}, nil
 }
 
-func (s *ServiceImpl) ReceiveForward(ctx context.Context, args command.Args, opt *command.RemoteOpt) (proto.Message, error) {
+func (s *ServiceImpl) ReceiveForward(ctx context.Context, args command.Args, stream connection.Stream) (proto.Message, error) {
 	tunnelKey, exists := args["tunnel_key"]
 	if !exists {
 		return nil, fmt.Errorf("tunnel_key argument is required")
@@ -131,14 +139,14 @@ func (s *ServiceImpl) ReceiveForward(ctx context.Context, args command.Args, opt
 	plog.Debugc(ctx, "received forward request: %s, %s", tunnelKey.GetStrValue(), localAddr.GetStrValue())
 
 	ctx = plog.With(ctx, "receiveForward")
-	if err := s.tunnelClient.ReceiveTunnel(ctx, tunnelKey.GetStrValue(), localAddr.GetStrValue(), opt.Stream); err != nil {
+	if err := s.tunnelClient.ReceiveTunnel(ctx, tunnelKey.GetStrValue(), localAddr.GetStrValue(), stream); err != nil {
 		return nil, fmt.Errorf("failed to receive forward tunnel: %v", err)
 	}
 
 	return nil, nil
 }
 
-func (s *ServiceImpl) ListTunnel(ctx context.Context, args command.Args, _ *command.RemoteOpt) (proto.Message, error) {
+func (s *ServiceImpl) ListTunnel(ctx context.Context, args command.Args) (proto.Message, error) {
 	ts := s.tunnelClient.ListTunnels()
 
 	resp := &command.ListTunnelResp{}
@@ -154,7 +162,7 @@ func (s *ServiceImpl) ListTunnel(ctx context.Context, args command.Args, _ *comm
 	return resp, nil
 }
 
-func (s *ServiceImpl) CloseTunnel(ctx context.Context, args command.Args, _ *command.RemoteOpt) (proto.Message, error) {
+func (s *ServiceImpl) CloseTunnel(ctx context.Context, args command.Args) (proto.Message, error) {
 	tunnelKey, exists := args["tunnel_key"]
 	if !exists {
 		return nil, fmt.Errorf("tunnel_key argument is required")

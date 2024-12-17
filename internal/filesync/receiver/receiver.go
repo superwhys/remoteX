@@ -31,7 +31,6 @@ func (rt *ReceiveTransfer) TransferSize() int64 {
 
 func (rt *ReceiveTransfer) Transfer(ctx context.Context, file *pb.FileBase, opts *pb.SyncOpts) error {
 	targetPath := filepath.Join(rt.Dest, file.GetEntry().GetWpath())
-	ctx = plog.With(ctx, "file", targetPath)
 
 	// generate each file sum and send
 	plog.Debugc(ctx, "start calc file hash")

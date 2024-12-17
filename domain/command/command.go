@@ -5,11 +5,20 @@ import (
 	"encoding/json"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
+type CommandContext struct {
+	IsRemote  bool
+	Remote    connection.Stream
+	RawRemote connection.StreamConnection
+}
+
 type CommandProvider interface {
-	Invoke(ctx context.Context, cmd *Command, opt *RemoteOpt) (proto.Message, error)
+	Name() string
+	SupportedCommands() []CommandType
+	Invoke(ctx context.Context, cmd *Command, cmdCtx *CommandContext) (proto.Message, error)
 }
 
 func StrArg(val string) Command_Arg {
