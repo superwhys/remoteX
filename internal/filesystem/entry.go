@@ -16,3 +16,7 @@ func init() {
 		return resp, nil
 	})
 }
+
+func (e *Entry) IsDir() bool {
+	return e.GetType() == EntryTypeDir
+}

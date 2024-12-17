@@ -25,10 +25,13 @@ import (
 var _ sync.Service = (*ServiceImpl)(nil)
 
 type ServiceImpl struct {
+	filesyncer filesync.FileSyncer
 }
 
 func NewSyncService() *ServiceImpl {
-	return &ServiceImpl{}
+	return &ServiceImpl{
+		filesyncer: filesync.NewFileSyncer(),
+	}
 }
 
 func (s *ServiceImpl) ParseArgs(args command.Args) (opts *pb.SyncOpts, err error) {
@@ -100,7 +103,7 @@ func (s *ServiceImpl) Push(ctx context.Context, args command.Args, opt *command.
 		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
 	}
 
-	resp, err := filesync.SendFiles(ctx, stream, opts.Path, opts)
+	resp, err := s.filesyncer.SendFiles(ctx, stream, opts.Path, opts)
 	if err != nil {
 		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
 	}
@@ -127,9 +130,10 @@ func (s *ServiceImpl) Pull(ctx context.Context, args command.Args, opt *command.
 		return nil, errorutils.ErrCommand(int32(command.Pull), args, errorutils.WithError(err))
 	}
 
-	if err := filesync.ReceiveFile(ctx, stream, opts.Dest, opts); err != nil {
+	resp, err := s.filesyncer.ReceiveFiles(ctx, stream, opts.Dest, opts)
+	if err != nil {
 		return nil, errorutils.ErrCommand(int32(command.Pull), args, errorutils.WithError(err))
 	}
 
-	return nil, nil
+	return resp, nil
 }

@@ -17,18 +17,21 @@ message SyncOpts {
 }
 
 message FileBase {
-	filesystem.Entry entry = 1 [(ext.nullable) = true];
-  	bool is_end = 2;
-}
-
-message FileList {
-	int64 total_size = 1;
-  	string strip = 2;
-  	repeated FileBase files = 3 [(ext.nullable) = true];
+	int64 idx = 1;
+	filesystem.Entry entry = 2 [(ext.nullable) = true];
+	string strip = 3;
+	int64 actual_send = 4;
+	bool is_end = 5;
 }
 
 message FileIdx {
 	int64 idx = 1;
+}
+
+message FileSyncAck {
+	bool success = 1;
+	int64 receive_size = 2;
+	int64 idx = 3;
 }
 
 message HashBuf {
@@ -60,13 +63,13 @@ message FileChunk {
 	bool is_end = 3;
 }
 
-message syncFile {
+message SyncFile {
 	string name = 1;
 	int64 size = 2;
 	filesystem.EntryType type = 3;
 }
 
-message errorFile {
+message ErrorFile {
 	string name = 1;
 	string message = 2;
 }
@@ -75,6 +78,6 @@ message SyncResp {
 	int64 total = 1;
 	int64 total_size = 2 [(ext.json) = "total_size"];
 	int64 actual_send_bytes = 3 [(ext.json) = "actual_send_bytes"];
-	repeated syncFile files = 4 [(ext.nullable) = true];
-	repeated errorFile error_files = 5 [(ext.nullable) = true, (ext.json) = "error_files,omitempty"];
+	repeated SyncFile files = 4 [(ext.nullable) = true];
+	repeated ErrorFile error_files = 5 [(ext.nullable) = true, (ext.json) = "error_files,omitempty"];
 }

@@ -19,118 +19,39 @@ import (
 )
 
 type ReceiveTransfer struct {
-	Fs        filesystem.FileSystem
-	Opts      *pb.SyncOpts
-	Dest      string
-	DestIsDir bool
-	Rw        protoutils.ProtoMessageReadWriter
+	Fs            filesystem.FileSystem
+	Rw            protoutils.ProtoMessageReadWriter
+	Dest          string
+	ActualReceive int
 }
 
-func (rt *ReceiveTransfer) receiveOpts() (*pb.SyncOpts, error) {
-	opts := new(pb.SyncOpts)
-	if err := rt.Rw.ReadMessage(opts); err != nil {
-		return nil, err
-	}
-
-	return opts, nil
+func (rt *ReceiveTransfer) TransferSize() int64 {
+	return int64(rt.ActualReceive)
 }
 
-func (rt *ReceiveTransfer) MergeRemoteOpts() error {
-	opts, err := rt.receiveOpts()
+func (rt *ReceiveTransfer) Transfer(ctx context.Context, file *pb.FileBase, opts *pb.SyncOpts) error {
+	targetPath := filepath.Join(rt.Dest, file.GetEntry().GetWpath())
+	ctx = plog.With(ctx, "file", targetPath)
+
+	// generate each file sum and send
+	plog.Debugc(ctx, "start calc file hash")
+	err := rt.calcFileHashAndSend(ctx, targetPath, opts)
 	if err != nil {
-		return errors.Wrap(err, "receiveRemoteOpts")
+		return errors.Wrapf(err, "calculate file hash: %s", targetPath)
 	}
+	plog.Debugc(ctx, "calc file hash success")
 
-	rt.Opts.DryRun = opts.DryRun
-	rt.Opts.Whole = opts.Whole
-
+	// receive server file match chunk
+	plog.Debugc(ctx, "start transfer file")
+	if err := rt.receiveFile(ctx, targetPath); err != nil {
+		return errors.Wrap(err, "transferFile")
+	}
 	return nil
 }
 
-func (rt *ReceiveTransfer) CheckDesk(fileCnt int, dest string) error {
-	info, err := os.Stat(dest)
-	if err != nil && !os.IsNotExist(err) {
-		return errors.Wrap(err, "stat")
-	}
-
-	if info == nil {
-		// dest not exists
-		// if multiple files are received, dest must be a folder
-		// if just has one file and dest is not exists, it will be treated as a file
-		if fileCnt > 1 {
-			rt.DestIsDir = true
-		}
-	} else {
-		rt.DestIsDir = info.IsDir()
-	}
-
-	if fileCnt > 1 && !rt.DestIsDir {
-		return errors.New("dest is not a directory")
-	}
-
-	if rt.DestIsDir && info == nil {
-		err = os.MkdirAll(dest, 0755)
-	} else if !rt.DestIsDir {
-		destBaseDir := filepath.Dir(dest)
-		if !putils.FileExists(destBaseDir) {
-			err = os.MkdirAll(destBaseDir, 0755)
-		}
-	}
-
-	if err != nil {
-		return errors.Wrap(err, "mkdir")
-	}
-
-	return nil
-}
-
-func (rt *ReceiveTransfer) ReceiveFileList(ctx context.Context) (*pb.FileList, error) {
-	var fileList pb.FileList
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		f := &pb.FileBase{}
-		if err := rt.Rw.ReadMessage(f); err != nil {
-			return nil, err
-		}
-
-		if f.IsEnd {
-			break
-		}
-
-		if f.Entry.Type == filesystem.EntryTypeDir {
-			targetDir := filepath.Join(rt.Dest, f.GetEntry().GetWpath())
-			if err := rt.CheckDir(targetDir); err != nil {
-				return nil, errors.Wrapf(err, "checkdir: %s", targetDir)
-			}
-		}
-
-		fileList.Files = append(fileList.Files, f)
-		if f.GetEntry().GetRegular() {
-			fileList.TotalSize += f.GetEntry().GetSize()
-		}
-	}
-
-	fileList.Sort()
-
-	return &fileList, nil
-}
-
-func (rt *ReceiveTransfer) CheckDir(dir string) error {
-	if putils.FileExists(dir) {
-		return nil
-	}
-
-	return os.MkdirAll(dir, os.FileMode(0755))
-}
-
-func (rt *ReceiveTransfer) CalcFileHashAndSend(ctx context.Context, local string) error {
+func (rt *ReceiveTransfer) calcFileHashAndSend(ctx context.Context, local string, opts *pb.SyncOpts) error {
 	// whole file
-	if rt.Opts.Whole || !putils.FileExists(local) {
+	if opts.Whole || !putils.FileExists(local) {
 		return rt.Rw.WriteMessage(&pb.HashHead{
 			BlockLength: int64(common.BlockSize),
 		})
@@ -166,6 +87,21 @@ func (rt *ReceiveTransfer) CalcFileHashAndSend(ctx context.Context, local string
 	return nil
 }
 
+func (rt *ReceiveTransfer) receiveFile(ctx context.Context, targetPath string) (err error) {
+	var target filesystem.File
+	if !putils.FileExists(targetPath) {
+		target, err = rt.Fs.CreateFile(targetPath)
+	} else {
+		target, err = rt.Fs.OpenFile(targetPath)
+	}
+	if err != nil {
+		return errors.Wrap(err, "openFile")
+	}
+
+	fileChunkIter := rt.receiveFileChunkIter(ctx)
+	return rt.syncFile(ctx, fileChunkIter, target)
+}
+
 func (rt *ReceiveTransfer) receiveFileChunkIter(ctx context.Context) (fileChunkIter iter.Seq2[*pb.FileChunk, error]) {
 	return func(yield func(*pb.FileChunk, error) bool) {
 		for {
@@ -189,21 +125,6 @@ func (rt *ReceiveTransfer) receiveFileChunkIter(ctx context.Context) (fileChunkI
 	}
 }
 
-func (rt *ReceiveTransfer) TransferFile(ctx context.Context, targetPath string) (err error) {
-	var target filesystem.File
-	if !putils.FileExists(targetPath) {
-		target, err = rt.Fs.CreateFile(targetPath)
-	} else {
-		target, err = rt.Fs.OpenFile(targetPath)
-	}
-	if err != nil {
-		return errors.Wrap(err, "openFile")
-	}
-
-	fileChunkIter := rt.receiveFileChunkIter(ctx)
-	return rt.syncFile(ctx, fileChunkIter, target)
-}
-
 func (rt *ReceiveTransfer) syncFileToWriter(ctx context.Context, fileChunkIter iter.Seq2[*pb.FileChunk, error], target filesystem.File, writer io.Writer) error {
 	for fileChunk, err := range fileChunkIter {
 		if err != nil {
@@ -225,6 +146,8 @@ func (rt *ReceiveTransfer) syncFileToWriter(ctx context.Context, fileChunkIter i
 		if err != nil {
 			return errors.Wrap(err, "write to Writer")
 		}
+
+		rt.ActualReceive += len(fileChunk.GetData())
 
 		select {
 		case <-ctx.Done():

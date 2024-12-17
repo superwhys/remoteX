@@ -3,10 +3,7 @@ package sender
 import (
 	"context"
 	"io"
-	"io/fs"
-	"iter"
 	"path/filepath"
-	"strings"
 
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
@@ -18,7 +15,6 @@ import (
 
 type SendTransfer struct {
 	Fs         filesystem.FileSystem
-	Opts       *pb.SyncOpts
 	Rw         protoutils.ProtoMessageReadWriter
 	ActualSend int
 }
@@ -27,49 +23,40 @@ func (st *SendTransfer) SendOpts(opts *pb.SyncOpts) error {
 	return st.Rw.WriteMessage(opts)
 }
 
-func (st *SendTransfer) SendFileList(ctx context.Context, root string) (*pb.FileList, error) {
-	var fileList pb.FileList
-
-	strip := filepath.Dir(filepath.Clean(root)) + "/"
-	if strings.HasSuffix(root, "/") {
-		strip = filepath.Clean(root) + "/"
-	}
-
-	fileList.Strip = strip
-
-	for f := range st.GetFileList(root) {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		fileList.Files = append(fileList.Files, f)
-		fileList.TotalSize += f.GetEntry().GetSize()
-
-		if err := st.Rw.WriteMessage(f); err != nil {
-			return nil, errors.Wrapf(err, "write file: %s", f.GetEntry().GetName())
-		}
-	}
-
-	fileList.Sort()
-
-	if err := st.Rw.WriteMessage(&pb.FileBase{IsEnd: true}); err != nil {
-		return nil, errors.Wrap(err, "write end")
-	}
-
-	return &fileList, nil
+func (st *SendTransfer) TransferSize() int64 {
+	return int64(st.ActualSend)
 }
 
-func (st *SendTransfer) ReceiveFileIdx() (*pb.FileIdx, error) {
-	var fileIdx pb.FileIdx
-	if err := st.Rw.ReadMessage(&fileIdx); err != nil {
-		return nil, errors.Wrap(err, "read idx")
+func (st *SendTransfer) Transfer(ctx context.Context, file *pb.FileBase, opts *pb.SyncOpts) (err error) {
+	srcPath := filepath.Join(file.GetStrip(), file.GetEntry().GetWpath())
+	ctx = plog.With(ctx, "file", srcPath)
+
+	// receive client file sums
+	plog.Debugc(ctx, "start receive head sum")
+	head, err := st.receiveHeadSum(ctx)
+	if err != nil {
+		plog.Errorc(ctx, "receive head sum error: %v", err)
+		return errors.Wrap(err, "receiveHeadSum")
 	}
-	return &fileIdx, nil
+	plog.Debugc(ctx, "receive head sum: %v", head.GetCheckSumCount())
+
+	// transfer file
+	if len(head.GetHashs()) == 0 {
+		err = st.sendFile(ctx, file.GetEntry().GetSize(), srcPath)
+	} else {
+		err = st.hashMatch(ctx, head, srcPath)
+	}
+
+	if err != nil {
+		plog.Errorc(ctx, "transfer error: %v", err)
+		return errors.Wrap(err, "transferFile")
+	}
+
+	file.ActualSend = int64(st.ActualSend)
+	return nil
 }
 
-func (st *SendTransfer) ReceiveHeadSum(ctx context.Context) (*pb.HashHead, error) {
+func (st *SendTransfer) receiveHeadSum(ctx context.Context) (*pb.HashHead, error) {
 	var head pb.HashHead
 	if err := st.Rw.ReadMessage(&head); err != nil {
 		return nil, errors.Wrap(err, "read head")
@@ -98,7 +85,7 @@ func (st *SendTransfer) ReceiveHeadSum(ctx context.Context) (*pb.HashHead, error
 	return &head, nil
 }
 
-func (st *SendTransfer) SendFile(ctx context.Context, fileSize int64, srcPath string) (err error) {
+func (st *SendTransfer) sendFile(ctx context.Context, fileSize int64, srcPath string) (err error) {
 	plog.Debugf("start send whole file: %v", srcPath)
 	defer func() {
 		if err != nil {
@@ -145,7 +132,7 @@ func (st *SendTransfer) SendFile(ctx context.Context, fileSize int64, srcPath st
 	return st.Rw.WriteMessage(&pb.FileChunk{IsEnd: true})
 }
 
-func (st *SendTransfer) HashMatch(ctx context.Context, head *pb.HashHead, srcPath string) (err error) {
+func (st *SendTransfer) hashMatch(ctx context.Context, head *pb.HashHead, srcPath string) (err error) {
 	plog.Debugf("start send chunk file: %v", srcPath)
 	defer func() {
 		if err != nil {
@@ -177,50 +164,4 @@ func (st *SendTransfer) HashMatch(ctx context.Context, head *pb.HashHead, srcPat
 	}
 
 	return st.Rw.WriteMessage(&pb.FileChunk{IsEnd: true})
-}
-
-func (st *SendTransfer) GetFileList(root string) iter.Seq[*pb.FileBase] {
-	filter := func(path string, info fs.FileInfo) bool {
-		if path == root && info.IsDir() {
-			return false
-		}
-
-		info.Mode().IsRegular()
-		return true
-	}
-
-	return func(yield func(*pb.FileBase) bool) {
-		walkIter, err := st.Fs.WalkIter(root, filter)
-		if err != nil {
-			plog.Errorf("WalkIter error: %v", err)
-			return
-		}
-		for entry := range walkIter {
-			if entry.GetName() == root {
-				entry.Name = "."
-			}
-
-			f := &pb.FileBase{
-				Entry: entry,
-			}
-
-			if !yield(f) {
-				break
-			}
-		}
-	}
-}
-
-func (st *SendTransfer) Statistic(r *pb.SyncResp, file *pb.FileBase) *pb.SyncResp {
-	transFile := &pb.SyncFile{
-		Name: file.GetEntry().GetName(),
-		Size: file.GetEntry().GetSize(),
-		Type: file.GetEntry().GetType(),
-	}
-	r.Total++
-	r.TotalSize += file.GetEntry().GetSize()
-	r.ActualSendBytes = int64(st.ActualSend)
-	r.Files = append(r.Files, transFile)
-
-	return r
 }

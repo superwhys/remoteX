@@ -68,34 +68,41 @@ func TestTransferWholeFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	fileName := filepath.Base(tmpFile)
-	targetFile := filepath.Join(filepath.Dir(tmpFile), "sync"+fileName)
+	targetDest := filepath.Join(filepath.Dir(tmpFile), "sync")
 	defer func() {
 		os.Remove(tmpFile)
-		os.Remove(targetFile)
+		os.Remove(targetDest)
 	}()
 
-	fmt.Println(tmpFile, targetFile)
+	fmt.Println(tmpFile, targetDest)
+
+	fileSyncer := filesync.NewFileSyncer()
 
 	grp, ctx := errgroup.WithContext(context.Background())
 	grp.Go(func() error {
 		defer rw.Close()
-		_, err := filesync.SendFiles(ctx, rw, tmpFile, nil)
+		_, err := fileSyncer.SendFiles(ctx, rw, tmpFile, nil)
 		return err
 	})
 	grp.Go(func() error {
 		defer rw.Close()
-		return filesync.ReceiveFile(ctx, rw, targetFile, nil)
+		_, err := fileSyncer.ReceiveFiles(ctx, rw, targetDest, nil)
+		return err
 	})
 
 	if err := grp.Wait(); err != nil {
 		t.Fatal(err)
 	}
 
-	tempF, err := filesystem.BasicFs.OpenFile(tmpFile)
+	fs := filesystem.NewBasicFileSystem()
+
+	tempF, err := fs.OpenFile(tmpFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	targetF, err := filesystem.BasicFs.OpenFile(targetFile)
+
+	targetFile := filepath.Join(targetDest, fileName)
+	targetF, err := fs.OpenFile(targetFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,6 +121,7 @@ func TestTransferWholeFile(t *testing.T) {
 
 func TestTransferDir(t *testing.T) {
 	plog.Enable(level.LevelDebug)
+	fileSyncer := filesync.NewFileSyncer()
 
 	reader, writer := io.Pipe()
 	rd := protoutils.NewProtoReader(reader)
@@ -125,12 +133,13 @@ func TestTransferDir(t *testing.T) {
 	grp, ctx := errgroup.WithContext(context.Background())
 	grp.Go(func() error {
 		defer rw.Close()
-		_, err := filesync.SendFiles(ctx, rw, source, nil)
+		_, err := fileSyncer.SendFiles(ctx, rw, source, nil)
 		return err
 	})
 	grp.Go(func() error {
 		defer rw.Close()
-		return filesync.ReceiveFile(ctx, rw, target, nil)
+		_, err := fileSyncer.ReceiveFiles(ctx, rw, target, nil)
+		return err
 	})
 
 	if err := grp.Wait(); err != nil {

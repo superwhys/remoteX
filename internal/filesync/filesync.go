@@ -2,191 +2,207 @@ package filesync
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 
 	"github.com/go-puzzles/puzzles/plog"
+	"github.com/go-puzzles/puzzles/putils"
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/internal/filesync/pb"
-	"github.com/superwhys/remoteX/internal/filesync/receiver"
-	"github.com/superwhys/remoteX/internal/filesync/sender"
 	"github.com/superwhys/remoteX/internal/filesystem"
 	"github.com/superwhys/remoteX/pkg/protoutils"
 )
 
-func SendFiles(ctx context.Context, rw protoutils.ProtoMessageReadWriter, path string, opts *pb.SyncOpts) (resp *pb.SyncResp, err error) {
-	defer plog.Infof("Send Files: %v done", path)
-	opts = opts.SetDefault()
+type fileSyncer struct {
+	fs filesystem.FileSystem
+}
 
-	st := &sender.SendTransfer{
-		Fs:   filesystem.NewBasicFileSystem(),
-		Opts: opts,
-		Rw:   rw,
+func NewFileSyncer() *fileSyncer {
+	return &fileSyncer{
+		fs: filesystem.NewBasicFileSystem(),
+	}
+}
+
+func (f *fileSyncer) Statistic(r *pb.SyncResp, file *pb.FileBase) *pb.SyncResp {
+	if r == nil {
+		r = &pb.SyncResp{}
 	}
 
-	if err := st.SendOpts(opts); err != nil {
+	transFile := &pb.SyncFile{
+		Name: file.GetEntry().GetName(),
+		Size: file.GetEntry().GetSize(),
+		Type: file.GetEntry().GetType(),
+	}
+	r.Total++
+	r.TotalSize += file.GetEntry().GetSize()
+	r.ActualSendBytes = file.ActualSend
+	r.Files = append(r.Files, transFile)
+
+	return r
+}
+
+func (f fileSyncer) SendFiles(ctx context.Context, rw protoutils.ProtoMessageReadWriter, path string, opts *pb.SyncOpts) (resp *pb.SyncResp, err error) {
+	ctx = plog.With(ctx, "Send")
+	opts = opts.SetDefault()
+
+	if err := rw.WriteMessage(opts); err != nil {
 		return nil, errors.Wrap(err, "sendOpts")
 	}
 
-	fileList, err := st.SendFileList(ctx, path)
-	if err != nil {
-		return nil, errors.Wrap(err, "sendFileList")
-	}
-	fileCnt := len(fileList.Files)
-
 	resp = &pb.SyncResp{
-		Files:      make([]*pb.SyncFile, 0, fileCnt),
+		Files:      make([]*pb.SyncFile, 0, 10),
 		ErrorFiles: make([]*pb.ErrorFile, 0, 10),
 	}
 
-	for {
+	st := NewSendTransfer(rw)
+	fileListIter := f.sendFileList(ctx, path, rw)
+	for file, err := range fileListIter {
+		if err != nil {
+			plog.Errorc(ctx, "send fileList error: %v", err)
+			return nil, errors.Wrap(err, "send fileList")
+		}
+
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
 		}
 
-		// receive client process file idx
-		fileIdx, err := st.ReceiveFileIdx()
-		if err != nil {
-			return nil, errors.Wrap(err, "receiveFileIdx")
-		}
-		if fileIdx.GetIdx() <= 0 || int(fileIdx.GetIdx()) > fileCnt {
+		if file.GetIsEnd() {
 			break
 		}
 
-		file := fileList.GetFiles()[fileIdx.GetIdx()-1]
-		srcPath := filepath.Join(fileList.GetStrip(), file.GetEntry().GetWpath())
+		cCtx := plog.With(ctx, "file", file.GetEntry().GetWpath())
+		plog.Debugc(cCtx, "process file")
 
 		if opts.DryRun {
-			resp = st.Statistic(resp, file)
+			resp = f.Statistic(resp, file)
 			continue
 		}
 
-		err = func(ctx context.Context) error {
-			ctx = plog.With(ctx, "file", srcPath)
-			plog.Debugf("receive file idx %d", fileIdx.GetIdx())
-
-			// receive client file sums
-			plog.Debugc(ctx, "start receive head sum")
-			head, err := st.ReceiveHeadSum(ctx)
+		switch file.GetEntry().GetType() {
+		case filesystem.EntryTypeDir:
+		case filesystem.EntryTypeFile:
+			err = st.Transfer(cCtx, file, opts)
 			if err != nil {
-				plog.Errorc(ctx, "receive head sum error: %v", err)
-				return errors.Wrap(err, "receiveHeadSum")
+				plog.Errorc(cCtx, "send file %s error: %v", file.GetEntry().GetWpath(), err)
+				resp.ErrorFiles = append(resp.ErrorFiles, &pb.ErrorFile{
+					Name:    file.GetEntry().GetPath(),
+					Message: err.Error(),
+				})
+				continue
 			}
-			plog.Debugc(ctx, "receive head sum: %v", head.GetCheckSumCount())
+		default:
+			continue
+		}
 
-			// transfer file
-			if len(head.GetHashs()) == 0 {
-				err = st.SendFile(ctx, file.GetEntry().GetSize(), srcPath)
-			} else {
-				err = st.HashMatch(ctx, head, srcPath)
-			}
+		resp = f.Statistic(resp, file)
 
-			if err != nil {
-				plog.Errorc(ctx, "transfer error: %v", err)
-				return errors.Wrap(err, "transferFile")
-			}
-
-			// statistic
-			resp = st.Statistic(resp, file)
-			plog.Infoc(ctx, "transfer(%d/%d) success.", fileIdx.GetIdx(), len(fileList.Files))
-
-			return nil
-		}(ctx)
+		ack := &pb.FileSyncAck{}
+		err = rw.ReadMessage(ack)
 		if err != nil {
-			plog.Errorf("send file %s error: %v", srcPath, err)
-			resp.ErrorFiles = append(resp.ErrorFiles, &pb.ErrorFile{
-				Name:    file.GetEntry().GetPath(),
-				Message: err.Error(),
-			})
-			continue
+			plog.Errorc(cCtx, "read file sync ack error: %v", err)
+			return nil, errors.Wrap(err, "readFileSyncAck")
 		}
+
+		plog.Debugc(cCtx, "read sync file ack: %v", ack)
+		plog.Infoc(cCtx, "transfer success.")
+	}
+
+	err = rw.ReadMessage(&pb.FileIdx{})
+	if err != nil {
+		plog.Errorc(ctx, "read done fileIdx error: %v", err)
+		return nil, errors.Wrap(err, "readDoneFileIdx")
 	}
 
 	return resp, nil
 }
 
-func ReceiveFile(ctx context.Context, rw protoutils.ProtoMessageReadWriter, dest string, opts *pb.SyncOpts) error {
+func (f fileSyncer) ReceiveFiles(ctx context.Context, rw protoutils.ProtoMessageReadWriter, dest string, opts *pb.SyncOpts) (resp *pb.SyncResp, err error) {
+	ctx = plog.With(ctx, "Receive")
+
+	if err := f.checkDest(dest); err != nil {
+		return nil, errors.Wrap(err, "checkDesk")
+	}
+
 	opts = opts.SetDefault()
+	remoteOpts := new(pb.SyncOpts)
+	if err := rw.ReadMessage(remoteOpts); err != nil {
+		return nil, err
+	}
+	opts.Merge(remoteOpts)
 
-	rt := &receiver.ReceiveTransfer{
-		Fs:   filesystem.NewBasicFileSystem(),
-		Opts: opts,
-		Dest: dest,
-		Rw:   rw,
+	resp = &pb.SyncResp{
+		Files:      make([]*pb.SyncFile, 0, 10),
+		ErrorFiles: make([]*pb.ErrorFile, 0, 10),
 	}
 
-	err := rt.MergeRemoteOpts()
-	if err != nil {
-		return errors.Wrap(err, "mergeRemoteOpts")
-	}
-	opts = rt.Opts
+	rt := NewReceiverTransfer(rw, dest)
+	fileListIter := f.receiveFileList(ctx, rw)
+	for file, err := range fileListIter {
+		if err != nil {
+			plog.Errorc(ctx, "receive fileList error: %v", err)
+			return nil, errors.Wrap(err, "receive fileList")
+		}
 
-	// receive fileList
-	fileList, err := rt.ReceiveFileList(ctx)
-	if err != nil {
-		return errors.Wrap(err, "receiveFileList")
-	}
-	fileCnt := len(fileList.Files)
-	plog.Debugf("receive file list, count: %d", fileCnt)
-
-	if err := rt.CheckDesk(fileCnt, dest); err != nil {
-		return errors.Wrap(err, "checkDesk")
-	}
-
-	for idx, f := range fileList.Files {
-		idx = idx + 1
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
-		if f.Entry.Type == filesystem.EntryTypeDir {
-			// TODO: create dir if not exsits
-			continue
+		if file.GetIsEnd() {
+			break
 		}
 
-		if err := rt.Rw.WriteMessage(&pb.FileIdx{Idx: int64(idx)}); err != nil {
-			return errors.Wrapf(err, "sendFileIdx: %s", f.GetEntry().GetName())
-		}
+		cCtx := plog.With(ctx, "file", file.GetEntry().GetWpath())
+		plog.Debugc(cCtx, "process file")
 
 		if opts.DryRun {
+			resp = f.Statistic(resp, file)
 			continue
 		}
 
-		var targetPath string
-		if rt.DestIsDir {
-			targetPath = filepath.Join(dest, f.GetEntry().GetWpath())
-		} else {
-			targetPath = dest
-		}
-
-		err = func(ctx context.Context) error {
-			ctx = plog.With(ctx, "file", targetPath)
-
-			// generate each file sum and send
-			plog.Debugc(ctx, "start calc file hash")
-			err := rt.CalcFileHashAndSend(ctx, targetPath)
+		switch file.GetEntry().GetType() {
+		case filesystem.EntryTypeDir:
+			t := filepath.Join(dest, file.GetEntry().GetWpath())
+			if !putils.FileExists(t) {
+				err = os.MkdirAll(t, 0755)
+				if err != nil {
+					rw.WriteMessage(&pb.FileIdx{Idx: -1})
+					return nil, errors.Wrapf(err, "create dir: %s", t)
+				}
+			}
+		case filesystem.EntryTypeFile:
+			err = rt.Transfer(cCtx, file, opts)
 			if err != nil {
-				return errors.Wrapf(err, "calculate file hash: %s", targetPath)
+				plog.Errorc(cCtx, "receive file %s error: %v", file.GetEntry().GetPath(), err)
+				rw.WriteMessage(&pb.FileIdx{Idx: -1})
+				return nil, errors.Wrapf(err, "receive file: %s", file.GetEntry().GetPath())
 			}
-			plog.Debugc(ctx, "calc file hash success")
-
-			// receive server file match chunk
-			plog.Debugc(ctx, "start transfer file")
-			if err := rt.TransferFile(ctx, targetPath); err != nil {
-				return errors.Wrap(err, "transferFile")
-			}
-			plog.Infoc(ctx, "transfer(%d/%d) success.", idx, len(fileList.Files))
-			return nil
-		}(ctx)
-		if err != nil {
-			plog.Errorf("receive file %s error: %v", targetPath, err)
-			rt.Rw.WriteMessage(&pb.FileIdx{Idx: -1})
-			return errors.Wrapf(err, "receive file: %s", targetPath)
+		default:
+			continue
 		}
+
+		resp = f.Statistic(resp, file)
+
+		err = rw.WriteMessage(&pb.FileSyncAck{
+			Success:     true,
+			ReceiveSize: rt.TransferSize(),
+			Idx:         file.GetIdx(),
+		})
+		if err != nil {
+			plog.Errorc(cCtx, "write file sync ack error: %v", err)
+			return nil, errors.Wrap(err, "writeFileSyncAck")
+		}
+		plog.Infoc(cCtx, "transfer success.")
 	}
 
-	return rt.Rw.WriteMessage(&pb.FileIdx{Idx: -1})
+	err = rw.WriteMessage(&pb.FileIdx{Idx: -1})
+	if err != nil {
+		plog.Errorc(ctx, "write done fileIdx error: %v", err)
+		return nil, errors.Wrap(err, "writeDoneFileIdx")
+	}
+
+	return resp, nil
 }
