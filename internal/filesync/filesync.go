@@ -85,7 +85,7 @@ func (f fileSyncer) SendFiles(ctx context.Context, rw protoutils.ProtoMessageRea
 		case filesystem.EntryTypeFile:
 			err = st.Transfer(cCtx, file, opts)
 			if err != nil {
-				plog.Errorc(cCtx, "send file %s error: %v", file.GetEntry().GetWpath(), err)
+				plog.Errorc(cCtx, "send file error: %v", err)
 				resp.ErrorFiles = append(resp.ErrorFiles, &pb.ErrorFile{
 					Name:    file.GetEntry().GetPath(),
 					Message: err.Error(),
@@ -176,7 +176,7 @@ func (f fileSyncer) ReceiveFiles(ctx context.Context, rw protoutils.ProtoMessage
 		case filesystem.EntryTypeFile:
 			err = rt.Transfer(cCtx, file, opts)
 			if err != nil {
-				plog.Errorc(cCtx, "receive file %s error: %v", file.GetEntry().GetPath(), err)
+				plog.Errorc(cCtx, "receive file error: %v", err)
 				rw.WriteMessage(&pb.FileIdx{Idx: -1})
 				return nil, errors.Wrapf(err, "receive file: %s", file.GetEntry().GetPath())
 			}
