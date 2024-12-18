@@ -62,7 +62,7 @@ func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, cmdCtx *
 	case command.Closetunnel:
 		return s.CloseTunnel(ctx, cmd.GetArgs())
 	default:
-		return nil, errorutils.ErrNotSupportCommandType(int32(cmd.Type))
+		return nil, errorutils.ErrCommandTypeNotSupport(cmd.GetType().String())
 	}
 }
 
@@ -84,12 +84,12 @@ func (s *ServiceImpl) ParseArgs(args command.Args) (*tunnelArgs, error) {
 		return a, nil
 	}
 
-	return nil, ea
+	return nil, errorutils.WrapRemoteXError(ea, "parseArgs")
 }
 
 func (s *ServiceImpl) validateTunnelArgs(tunnelArgs *tunnelArgs) error {
 	if tunnelArgs.localAddr == "" || tunnelArgs.remoteAddr == "" {
-		return fmt.Errorf("local_addr and remote_addr are required")
+		return errorutils.WrapRemoteXError(nil, "local_addr and remote_addr are required")
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ func (s *ServiceImpl) validateTunnelArgs(tunnelArgs *tunnelArgs) error {
 func (s *ServiceImpl) getStream(rw protoutils.ProtoMessageReadWriter) (connection.Stream, error) {
 	stream, ok := rw.(connection.Stream)
 	if !ok {
-		return nil, fmt.Errorf("failed to convert rw to stream")
+		return nil, errorutils.WrapRemoteXError(nil, "failed to convert rw to stream")
 	}
 	return stream, nil
 }
@@ -129,18 +129,18 @@ func (s *ServiceImpl) Forward(ctx context.Context, args command.Args, conn conne
 func (s *ServiceImpl) ReceiveForward(ctx context.Context, args command.Args, stream connection.Stream) (proto.Message, error) {
 	tunnelKey, exists := args["tunnel_key"]
 	if !exists {
-		return nil, fmt.Errorf("tunnel_key argument is required")
+		return nil, errorutils.ErrCommandMissingArguments(command.Reversereceive.String(), "tunnel_key")
 	}
 	localAddr, exists := args["addr"]
 	if !exists {
-		return nil, fmt.Errorf("addr argument is required")
+		return nil, errorutils.ErrCommandMissingArguments(command.Reversereceive.String(), "addr")
 	}
 
 	plog.Debugc(ctx, "received forward request: %s, %s", tunnelKey.GetStrValue(), localAddr.GetStrValue())
 
 	ctx = plog.With(ctx, "receiveForward")
 	if err := s.tunnelClient.ReceiveTunnel(ctx, tunnelKey.GetStrValue(), localAddr.GetStrValue(), stream); err != nil {
-		return nil, fmt.Errorf("failed to receive forward tunnel: %v", err)
+		return nil, errorutils.WrapRemoteXError(err, "receiveForwardTunnel")
 	}
 
 	return nil, nil
@@ -165,7 +165,7 @@ func (s *ServiceImpl) ListTunnel(ctx context.Context, args command.Args) (proto.
 func (s *ServiceImpl) CloseTunnel(ctx context.Context, args command.Args) (proto.Message, error) {
 	tunnelKey, exists := args["tunnel_key"]
 	if !exists {
-		return nil, fmt.Errorf("tunnel_key argument is required")
+		return nil, errorutils.ErrCommandMissingArguments(command.Closetunnel.String(), "tunnel_key")
 	}
 
 	s.tunnelClient.CloseTunnel(tunnelKey.GetStrValue())

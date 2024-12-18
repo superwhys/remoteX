@@ -39,7 +39,7 @@ func (s *RemoteXServer) receiveAndHandleCommand(ctx context.Context, stream conn
 	cmd := &command.Command{}
 	if err := stream.ReadMessage(cmd); err != nil {
 		stream.Close()
-		return errors.Wrap(err, "receiveCommand")
+		return errorutils.ErrReadCommand(err)
 	}
 
 	plog.Debugc(ctx, "received command: %v", cmd)
@@ -50,7 +50,12 @@ func (s *RemoteXServer) receiveAndHandleCommand(ctx context.Context, stream conn
 		return stream.WriteMessage(&command.Ret{ErrMsg: fmt.Sprintf("handle command failed: %v", err)})
 	}
 
-	return stream.WriteMessage(resp)
+	err = stream.WriteMessage(resp)
+	if err != nil {
+		return errorutils.WrapRemoteXError(err, "writeCommandResp")
+	}
+
+	return nil
 }
 
 func (s *RemoteXServer) HandleLocalCommand(ctx context.Context, cmd *command.Command) (resp *command.Ret, err error) {

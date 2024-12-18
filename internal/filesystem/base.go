@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/superwhys/remoteX/pkg/errorutils"
 )
 
 var (
@@ -35,22 +37,22 @@ func NewBasicFileSystem() FileSystem {
 
 func (f *BasicFileSystem) List(path string) (entries []*Entry, err error) {
 	if !filepath.IsAbs(path) {
-		return nil, ErrDirPahtNotAbs
+		return nil, errorutils.ErrDirPathNotAbs(path, nil)
 	}
 
 	if !PathExists(path) {
-		return nil, ErrDirPathNotFound
+		return nil, errorutils.ErrDirPathNotFound(path, nil)
 	}
 
 	dirEntries, err := os.ReadDir(path)
 	if err != nil {
-		return nil, err
+		return nil, errorutils.ErrReadDir(path, err)
 	}
 
 	for _, de := range dirEntries {
 		info, err := de.Info()
 		if err != nil {
-			return nil, err
+			return nil, errorutils.ErrGetInfo(de.Name(), err)
 		}
 
 		path := filepath.Join(path, de.Name())
@@ -81,11 +83,11 @@ func (f *BasicFileSystem) List(path string) (entries []*Entry, err error) {
 
 func (f *BasicFileSystem) Walk(path string, filter WalkFilter) (entries []*Entry, err error) {
 	if !filepath.IsAbs(path) {
-		return nil, ErrDirPahtNotAbs
+		return nil, errorutils.ErrDirPathNotAbs(path, nil)
 	}
 
 	if !PathExists(path) {
-		return nil, ErrDirPathNotFound
+		return nil, errorutils.ErrDirPathNotFound(path, nil)
 	}
 
 	return
@@ -94,7 +96,7 @@ func (f *BasicFileSystem) Walk(path string, filter WalkFilter) (entries []*Entry
 func (f *BasicFileSystem) checkWheatherDir(path string, info fs.FileInfo) (bool, error) {
 	fileInfo, err := os.Lstat(path)
 	if err != nil {
-		return false, err
+		return false, errorutils.ErrLstat(path, err)
 	}
 
 	if fileInfo.Mode()&os.ModeSymlink == 0 {
@@ -103,7 +105,7 @@ func (f *BasicFileSystem) checkWheatherDir(path string, info fs.FileInfo) (bool,
 
 	targetPath, err := os.Readlink(path)
 	if err != nil {
-		return false, err
+		return false, errorutils.ErrReadLink(path, err)
 	}
 
 	if !filepath.IsAbs(targetPath) {
@@ -112,7 +114,7 @@ func (f *BasicFileSystem) checkWheatherDir(path string, info fs.FileInfo) (bool,
 
 	targetInfo, err := os.Stat(targetPath)
 	if err != nil {
-		return false, err
+		return false, errorutils.ErrStat(targetPath, err)
 	}
 
 	return targetInfo.IsDir(), nil
@@ -120,11 +122,11 @@ func (f *BasicFileSystem) checkWheatherDir(path string, info fs.FileInfo) (bool,
 
 func (f *BasicFileSystem) WalkIter(root string, filter WalkFilter) (iter.Seq[*Entry], error) {
 	if !filepath.IsAbs(root) {
-		return nil, ErrDirPahtNotAbs
+		return nil, errorutils.ErrDirPathNotAbs(root, nil)
 	}
 
 	if !PathExists(root) {
-		return nil, ErrDirPathNotFound
+		return nil, errorutils.ErrDirPathNotFound(root, nil)
 	}
 
 	ch := make(chan *Entry)
@@ -179,7 +181,7 @@ func (f *BasicFileSystem) WalkIter(root string, filter WalkFilter) (iter.Seq[*En
 func (f *BasicFileSystem) OpenFile(path string) (File, error) {
 	file, err := os.OpenFile(path, os.O_RDONLY, 0666)
 	if err != nil {
-		return nil, err
+		return nil, errorutils.ErrOpenFile(path, err)
 	}
 
 	return &BaseFile{
@@ -190,7 +192,7 @@ func (f *BasicFileSystem) OpenFile(path string) (File, error) {
 func (f *BasicFileSystem) CreateFile(path string) (File, error) {
 	file, err := os.Create(path)
 	if err != nil {
-		return nil, err
+		return nil, errorutils.ErrCreateFile(path, err)
 	}
 
 	return &BaseFile{

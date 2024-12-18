@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/internal/filesystem"
 	"github.com/superwhys/remoteX/pkg/errorutils"
@@ -42,29 +41,29 @@ func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, cmdCtx *
 
 		err := cmdCtx.Remote.WriteMessage(cmd)
 		if err != nil {
-			return nil, errors.Wrap(err, "writeCommand")
+			return nil, errorutils.WrapRemoteXError(err, "writeCmdToRemote")
 		}
 
 		resp := new(command.Ret)
 		if err = cmdCtx.Remote.ReadMessage(resp); err != nil {
-			return nil, errors.Wrap(err, "readRespMessage")
+			return nil, errorutils.WrapRemoteXError(err, "readRemoteResp")
 		}
 
 		listResp, err := protoutils.DecodeAnyProto(resp.GetResp())
 		if err != nil {
-			return nil, errors.Wrap(err, "decodeAnyProto")
+			return nil, errorutils.WrapRemoteXError(err, "decodeRemoteResp")
 		}
 
 		return listResp, nil
 	default:
-		return nil, errors.New("unsupport command")
+		return nil, errorutils.ErrCommandTypeNotSupport(cmd.GetType().String())
 	}
 }
 
 func (s *ServiceImpl) ListDir(ctx context.Context, args command.Args) (proto.Message, error) {
 	path, exists := args.GetArg("path")
 	if !exists {
-		return nil, errorutils.ErrCommandMissingArguments(int32(command.Listdir), args)
+		return nil, errorutils.ErrCommandMissingArguments(command.Listdir.String(), "path")
 	}
 
 	entries, err := s.fs.List(path.GetStrValue())

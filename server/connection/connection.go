@@ -31,7 +31,7 @@ func NewConnectionService(local *url.URL, tlsConf *tls.Config) connection.Servic
 func (s *ServiceImpl) CreateListener(ctx context.Context, connCh chan<- connection.TlsConn) error {
 	creator, err := connection.GetListenerFactory(s.local)
 	if err != nil {
-		return errorutils.ErrConnection("", errorutils.WithError(err))
+		return errorutils.ErrGetListenerCreator(err)
 	}
 	lis := creator.New(s.local, s.tlsConf)
 
@@ -39,18 +39,14 @@ func (s *ServiceImpl) CreateListener(ctx context.Context, connCh chan<- connecti
 }
 
 func (s *ServiceImpl) EstablishConnection(ctx context.Context, target *url.URL) (connection.TlsConn, error) {
-	dialFactory, err := connection.GetDialerFactory(target)
+	creator, err := connection.GetDialerFactory(target)
 	if err != nil {
-		return nil, errorutils.ErrConnection("", errorutils.WithError(err))
+		return nil, errorutils.ErrGetDialerCreator(err)
 	}
 
-	streamConn, err := dialFactory.New(s.local, s.tlsConf).Dial(ctx, target)
+	streamConn, err := creator.New(s.local, s.tlsConf).Dial(ctx, target)
 	if err != nil {
-		return nil, errorutils.ErrConnection(
-			"",
-			errorutils.WithError(err),
-			errorutils.WithMsg("failed to establish connection"),
-		)
+		return nil, errorutils.ErrEstablishConnection(err)
 	}
 
 	return streamConn, nil
@@ -60,13 +56,13 @@ func (s *ServiceImpl) CheckConnection(conn connection.TlsConn) error {
 	cs := conn.ConnectionState()
 	certs := cs.PeerCertificates
 	if cl := len(certs); cl != 1 {
-		return errorutils.ErrConnection(conn.GetConnectionId(), errorutils.WithMsg("peer certificate invalidate"))
+		return errorutils.ErrConnectionCert
 	}
 
 	remoteCert := certs[0]
 	remoteID := common.NewNodeID(remoteCert.Raw)
 	if remoteID.String() == s.localNodeId {
-		return errorutils.ErrConnectToMyself(remoteID, conn.GetConnectionId())
+		return errorutils.ErrConnectToMyself
 	}
 
 	return nil
@@ -79,7 +75,7 @@ func (s *ServiceImpl) RegisterConnection(conn connection.TlsConn) {
 func (s *ServiceImpl) GetConnection(connId string) (connection.TlsConn, error) {
 	conn, ok := s.connections[connId]
 	if !ok {
-		return nil, errorutils.ErrConnectNotFound(connId)
+		return nil, errorutils.ErrConnectNotFound
 	}
 	return conn, nil
 }
@@ -87,7 +83,7 @@ func (s *ServiceImpl) GetConnection(connId string) (connection.TlsConn, error) {
 func (s *ServiceImpl) CloseConnection(connId string) error {
 	conn, ok := s.connections[connId]
 	if !ok {
-		return errorutils.ErrConnectNotFound(connId)
+		return errorutils.ErrConnectNotFound
 	}
 	conn.SetStatus(protocol.ConnectionStatusDisconnected)
 	delete(s.connections, connId)

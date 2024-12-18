@@ -76,7 +76,7 @@ func (c *TcpConnection) AcceptStream() (connection.Stream, error) {
 	if err != nil {
 		opErr := new(net.OpError)
 		if errors.As(err, &opErr) && !opErr.Timeout() {
-			return nil, errorutils.ErrConnectionRemoteDead(c.connId, opErr)
+			return nil, errorutils.ErrConnectionRemoteDead
 		}
 		return nil, errors.Wrap(err, "acceptStream")
 	}

@@ -34,9 +34,9 @@ func MountApiService[AS ApiService[R], R any](srv *server.RemoteXServer) gin.Han
 
 		ret := &Ret{Data: resp}
 		if err != nil {
-			var be *errorutils.BaseError
+			var be *errorutils.RemoteXError
 			if errors.As(err, &be) {
-				ret.ErrNo = be.Code
+				ret.ErrNo = be.Code()
 			} else {
 				ret.ErrNo = 0
 			}

@@ -65,7 +65,6 @@ func (f *fileSyncer) sendFileList(ctx context.Context, root string, rw protoutil
 			default:
 			}
 
-			plog.Infof("write file message: %v", f)
 			err := rw.WriteMessage(f)
 			if err != nil && !yield(nil, errors.Wrapf(err, "write file: %s", f.GetEntry().GetName())) {
 				return

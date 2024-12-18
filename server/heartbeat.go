@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/domain/node"
+	"github.com/superwhys/remoteX/pkg/errorutils"
 )
 
 func (s *RemoteXServer) schedulerHeartbeat(ctx context.Context, conn connection.TlsConn, hbStartNotify chan struct{}) error {
@@ -27,7 +28,7 @@ func (s *RemoteXServer) schedulerHeartbeat(ctx context.Context, conn connection.
 
 	hbStream, err := streamGetter()
 	if err != nil {
-		return errors.Wrap(err, "failed to get heartbeat stream")
+		return errorutils.ErrGetHeartbeatStream(err)
 	}
 	defer hbStream.Close()
 
@@ -39,11 +40,11 @@ func (s *RemoteXServer) schedulerHeartbeat(ctx context.Context, conn connection.
 
 	for {
 		if err := hbStream.SetDeadline(time.Now().Add(s.heartbeatInterval)); err != nil {
-			return errors.Wrap(err, "failed to set write deadline")
+			return errorutils.WrapRemoteXError(err, "failed to set write deadline")
 		}
 
 		if err := handler(hbStream); err != nil {
-			return errors.Wrap(err, "failed to handle heartbeat")
+			return errorutils.WrapRemoteXError(err, "failed to handle heartbeat")
 		}
 
 		conn.UpdateLastHeartbeat()
@@ -64,7 +65,7 @@ func (s *RemoteXServer) sendHeartbeat(stream connection.Stream) error {
 	cn.IsLocal = false
 
 	if err := stream.WriteMessage(cn); err != nil {
-		return errors.Wrap(err, "failed to write heartbeat message")
+		return errorutils.WrapRemoteXError(err, "send heartbeat")
 	}
 
 	plog.Debugf("send heartbeat to %v", stream.RemoteAddr())
@@ -75,7 +76,7 @@ func (s *RemoteXServer) sendHeartbeat(stream connection.Stream) error {
 func (s *RemoteXServer) receiveHeartbeat(stream connection.Stream) error {
 	rn := new(node.Node)
 	if err := stream.ReadMessage(rn); err != nil {
-		return errors.Wrap(err, "failed to read heartbeat message")
+		return errorutils.WrapRemoteXError(err, "read heartbeat")
 	}
 
 	if err := s.NodeService.UpdateHeartbeat(stream.GetNodeId()); err != nil {

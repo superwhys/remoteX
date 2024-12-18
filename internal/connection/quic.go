@@ -72,8 +72,8 @@ func (c *QuicConnection) SetWriteDeadline(_ time.Time) error {
 
 func (c *QuicConnection) AcceptStream() (connection.Stream, error) {
 	stream, err := c.quicConn.AcceptStream(context.TODO())
-	if idleErr, ok := err.(*quic.IdleTimeoutError); ok {
-		return nil, errorutils.ErrConnectionRemoteDead(c.connId, idleErr)
+	if _, ok := err.(*quic.IdleTimeoutError); ok {
+		return nil, errorutils.ErrConnectionRemoteDead
 	} else if err != nil {
 		return nil, err
 	}

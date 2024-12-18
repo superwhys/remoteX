@@ -2,12 +2,12 @@ package command
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 	"github.com/superwhys/remoteX/domain/command"
+	"github.com/superwhys/remoteX/pkg/errorutils"
 	"github.com/superwhys/remoteX/server/command/filesystem"
 	"github.com/superwhys/remoteX/server/command/sync"
 	"github.com/superwhys/remoteX/server/command/tunnel"
@@ -64,17 +64,17 @@ func (s *ServiceImpl) RegisterProvider(provider command.CommandProvider) {
 func (s *ServiceImpl) Execute(ctx context.Context, cmd *command.Command, cmdCtx *command.CommandContext) (*command.Ret, error) {
 	provider, ok := s.providers[cmd.Type]
 	if !ok {
-		return nil, fmt.Errorf("unknown command type: %s", cmd.Type)
+		return nil, errorutils.ErrCommandTypeNotSupport(cmd.Type.String())
 	}
 
 	resp, err := provider.Invoke(ctx, cmd, cmdCtx)
 	if err != nil {
-		return nil, err
+		return nil, errorutils.ErrInvokeProvider(cmd.Type.String())
 	}
 
 	anyData, err := types.MarshalAny(resp)
 	if err != nil {
-		return nil, err
+		return nil, errorutils.WrapRemoteXError(err, "encodeInvokeResp")
 	}
 
 	return &command.Ret{

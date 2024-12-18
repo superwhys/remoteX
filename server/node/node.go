@@ -36,12 +36,12 @@ func (ds *ServiceImpl) RegisterNode(n *node.Node) error {
 
 	oldNode, _ := ds.nodes[n.NodeId]
 	if oldNode != nil && oldNode.CheckNodeOnline() {
-		return errorutils.ErrNode(n.NodeId, errorutils.WithMsg("Has a same online node"))
+		return errorutils.ErrSameOnlineNode(n.NodeId)
 	}
 
 	addr := n.Address
 	if addr.IpAddress == "" || addr.Port == 0 {
-		return errorutils.ErrNode(n.NodeId, errorutils.WithMsg("missing addr or port"))
+		return errorutils.ErrNodeMissingHostPort(n.NodeId)
 	}
 	ds.nodes[n.NodeId] = n
 	return nil

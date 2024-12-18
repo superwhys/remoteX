@@ -13,7 +13,6 @@ import (
 	"fmt"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/domain/command/sync"
 	"github.com/superwhys/remoteX/internal/filesync"
@@ -72,7 +71,7 @@ func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, cmdCtx *
 	if cmdCtx.IsRemote {
 		err := s.tellRemoteTo(cmd, cmdCtx.Remote)
 		if err != nil {
-			return nil, errors.Wrap(err, "tellRemoteTo")
+			return nil, errorutils.ErrHandleCommand(cmd.GetType().String(), "tellRemoteTo", err.Error())
 		}
 	}
 
@@ -82,7 +81,7 @@ func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, cmdCtx *
 	case command.Pull:
 		return s.Pull(ctx, cmd.Args, cmdCtx.Remote)
 	default:
-		return nil, errorutils.ErrNotSupportCommandType(int32(cmd.Type))
+		return nil, errorutils.ErrCommandTypeNotSupport(cmd.GetType().String())
 	}
 }
 
@@ -94,7 +93,7 @@ func (s *ServiceImpl) tellRemoteTo(cmd *command.Command, rw protoutils.ProtoMess
 	case command.Pull:
 		remoteCmdType = command.Push
 	default:
-		return errorutils.ErrNotSupportCommandType(int32(cmd.GetType()))
+		return errorutils.ErrCommandTypeNotSupport(cmd.GetType().String())
 	}
 
 	remoteCmd := &command.Command{
@@ -103,7 +102,7 @@ func (s *ServiceImpl) tellRemoteTo(cmd *command.Command, rw protoutils.ProtoMess
 	}
 
 	if err := rw.WriteMessage(remoteCmd); err != nil {
-		return errors.Wrap(err, "sendCommand")
+		return err
 	}
 
 	return nil
@@ -112,15 +111,15 @@ func (s *ServiceImpl) tellRemoteTo(cmd *command.Command, rw protoutils.ProtoMess
 func (s *ServiceImpl) Push(ctx context.Context, args command.Args, rw protoutils.ProtoMessageReadWriter) (proto.Message, error) {
 	opts, err := s.ParseArgs(args)
 	if err != nil {
-		return nil, err
+		return nil, errorutils.ErrCommandArgsError(command.Push.String(), err.Error())
 	}
 	if opts.Path == "" {
-		return nil, errorutils.ErrCommandMissingArguments(int32(command.Push), args)
+		return nil, errorutils.ErrCommandMissingArguments(command.Push.String(), "path")
 	}
 
 	resp, err := s.filesyncer.SendFiles(ctx, rw, opts.Path, opts)
 	if err != nil {
-		return nil, errorutils.ErrCommand(int32(command.Push), args, errorutils.WithError(err))
+		return nil, errorutils.ErrHandleCommand(command.Push.String(), err.Error())
 	}
 
 	return resp, nil
@@ -129,15 +128,15 @@ func (s *ServiceImpl) Push(ctx context.Context, args command.Args, rw protoutils
 func (s *ServiceImpl) Pull(ctx context.Context, args command.Args, rw protoutils.ProtoMessageReadWriter) (proto.Message, error) {
 	opts, err := s.ParseArgs(args)
 	if err != nil {
-		return nil, err
+		return nil, errorutils.ErrCommandArgsError(command.Pull.String(), err.Error())
 	}
 	if opts.Dest == "" {
-		return nil, errorutils.ErrCommandMissingArguments(int32(command.Pull), args)
+		return nil, errorutils.ErrCommandMissingArguments(command.Pull.String(), "dest")
 	}
 
 	resp, err := s.filesyncer.ReceiveFiles(ctx, rw, opts.Dest, opts)
 	if err != nil {
-		return nil, errorutils.ErrCommand(int32(command.Pull), args, errorutils.WithError(err))
+		return nil, errorutils.ErrHandleCommand(command.Pull.String(), err.Error())
 	}
 
 	return resp, nil
