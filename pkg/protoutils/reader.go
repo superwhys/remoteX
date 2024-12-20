@@ -10,7 +10,7 @@ import (
 )
 
 type ProtoMessageReader interface {
-	io.ReadCloser
+	io.Closer
 	ReadMessage(message proto.Message) error
 }
 
@@ -22,10 +22,6 @@ func NewProtoReader(r io.ReadCloser) *ProtoReader {
 	return &ProtoReader{
 		reader: r,
 	}
-}
-
-func (r *ProtoReader) Read(p []byte) (n int, err error) {
-	return r.reader.Read(p)
 }
 
 func (r *ProtoReader) ReadMessage(msg proto.Message) error {

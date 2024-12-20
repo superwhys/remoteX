@@ -46,11 +46,10 @@ message NodeTransConfiguration {
 message Node {
   string id = 1 [(ext.goname) = "NodeId", (ext.json) = "node_id", (ext.node_id) = true];
   string connection_id = 2;
-  string name = 3 [(ext.yaml) = "name"];
-  protocol.Address address = 4 [(ext.yaml) = "address"];
-  NodeStatus status = 5;
-  bool is_local = 6;
-  NodeConnectRole role = 7;
-  NodeConfiguration configuration = 8 [(ext.nullable) = true];
-  int64 last_heartbeat = 9;
+  protocol.Address address = 3 [(ext.yaml) = "address"];
+  NodeStatus status = 4;
+  bool is_local = 5;
+  NodeConnectRole role = 6;
+  NodeConfiguration configuration = 7 [(ext.nullable) = true];
+  int64 last_heartbeat = 8;
 }

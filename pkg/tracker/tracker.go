@@ -1,6 +1,8 @@
 package tracker
 
-import "io"
+import (
+	"io"
+)
 
 type TrackerReader struct {
 	Reader         io.ReadCloser

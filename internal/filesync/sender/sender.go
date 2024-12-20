@@ -147,7 +147,16 @@ func (st *SendTransfer) hashMatch(ctx context.Context, head *pb.HashHead, srcPat
 	}
 	defer srcFile.Close()
 
-	matchIter, err := match.HashMatch(ctx, head, srcFile)
+	fi, err := srcFile.Stat()
+	if err != nil {
+		return errors.Wrapf(err, "stat file: %s", srcPath)
+	}
+
+	if fi.Size() == 0 {
+		return st.Rw.WriteMessage(&pb.FileChunk{IsEnd: true})
+	}
+
+	matchIter, err := match.HashMatch(ctx, head, srcFile, fi)
 	if err != nil {
 		return errors.Wrapf(err, "hash match: %s", srcPath)
 	}

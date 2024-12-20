@@ -51,6 +51,10 @@ func NewTcpConnectionClient(connId string, conn *tls.Conn) (*TcpConnection, erro
 	}, nil
 }
 
+func (c *TcpConnection) GetConnectionId() string {
+	return c.connId
+}
+
 func (c *TcpConnection) RemoteAddr() net.Addr {
 	return c.rawConn.RemoteAddr()
 }
@@ -108,7 +112,7 @@ var _ connection.Stream = (*TcpStream)(nil)
 
 type TcpStream struct {
 	*smux.Stream
-	*StreamReadWriter
+	protoutils.ProtoMessageReadWriter
 
 	pr           *protoutils.ProtoReader
 	pw           *protoutils.ProtoWriter
@@ -118,11 +122,20 @@ type TcpStream struct {
 
 func NewTcpStream(connId string, stream *smux.Stream) connection.Stream {
 	return &TcpStream{
-		Stream: stream,
-		StreamReadWriter: &StreamReadWriter{
-			pr:           protoutils.NewProtoReader(stream),
-			pw:           protoutils.NewProtoWriter(stream),
-			connectionId: connId,
-		},
+		connectionId:           connId,
+		Stream:                 stream,
+		ProtoMessageReadWriter: NewStreamReadWriter(stream),
 	}
+}
+
+func (t *TcpStream) GetConnectionId() string {
+	return t.connectionId
+}
+
+func (t *TcpStream) GetNodeId() common.NodeID {
+	return t.nodeId
+}
+
+func (t *TcpStream) SetNodeId(nodeId common.NodeID) {
+	t.nodeId = nodeId
 }

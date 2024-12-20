@@ -138,7 +138,7 @@ func TestFileHashMatch(t *testing.T) {
 	head.Hashs = slices.Collect(hash.CalcFileSubHash(head, size, targetFile.File()))
 
 	// In actual, matchIter data should be transmitted back to the client
-	matchIter, err := HashMatch(context.Background(), head, src)
+	matchIter, err := HashMatch(context.Background(), head, src, fi)
 	if !assert.Nil(t, err) {
 		return
 	}

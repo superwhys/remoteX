@@ -7,6 +7,9 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/pkg/errors"
+	"github.com/superwhys/remoteX/pkg/common"
+
 	"github.com/quic-go/quic-go"
 	"github.com/superwhys/remoteX/domain/connection"
 	"github.com/superwhys/remoteX/pkg/errorutils"
@@ -36,6 +39,10 @@ func NewQuicConnection(connId string, udpConn net.PacketConn, quicConn quic.Conn
 		udpConn:  udpConn,
 		quicConn: quicConn,
 	}
+}
+
+func (c *QuicConnection) GetConnectionId() string {
+	return c.connId
 }
 
 func (c *QuicConnection) Close() error {
@@ -72,10 +79,12 @@ func (c *QuicConnection) SetWriteDeadline(_ time.Time) error {
 
 func (c *QuicConnection) AcceptStream() (connection.Stream, error) {
 	stream, err := c.quicConn.AcceptStream(context.TODO())
-	if _, ok := err.(*quic.IdleTimeoutError); ok {
-		return nil, errorutils.ErrConnectionRemoteDead
-	} else if err != nil {
-		return nil, err
+	if err != nil {
+		var idleTimeoutError *quic.IdleTimeoutError
+		if errors.As(err, &idleTimeoutError) {
+			return nil, errorutils.ErrConnectionRemoteDead
+		}
+		return nil, errorutils.WrapRemoteXError(err, "quicAcceptStream")
 	}
 
 	s := NewQuicStream(c.connId, c.LocalAddr(), c.RemoteAddr(), stream)
@@ -103,22 +112,35 @@ var _ connection.Stream = (*QuicStream)(nil)
 
 type QuicStream struct {
 	quic.Stream
-	*StreamReadWriter
-	remoteAddr net.Addr
-	localAddr  net.Addr
+	protoutils.ProtoMessageReadWriter
+
+	remoteAddr   net.Addr
+	localAddr    net.Addr
+	nodeId       common.NodeID
+	connectionId string
 }
 
 func NewQuicStream(connId string, localAddr, remoteAddr net.Addr, stream quic.Stream) connection.Stream {
 	return &QuicStream{
-		remoteAddr: remoteAddr,
-		localAddr:  localAddr,
-		Stream:     stream,
-		StreamReadWriter: &StreamReadWriter{
-			pr:           protoutils.NewProtoReader(stream),
-			pw:           protoutils.NewProtoWriter(stream),
-			connectionId: connId,
-		},
+		Stream:                 stream,
+		ProtoMessageReadWriter: NewStreamReadWriter(stream),
+
+		remoteAddr:   remoteAddr,
+		localAddr:    localAddr,
+		connectionId: connId,
 	}
+}
+
+func (q *QuicStream) GetConnectionId() string {
+	return q.connectionId
+}
+
+func (q *QuicStream) GetNodeId() common.NodeID {
+	return q.nodeId
+}
+
+func (q *QuicStream) SetNodeId(nodeId common.NodeID) {
+	q.nodeId = nodeId
 }
 
 func (q *QuicStream) RemoteAddr() net.Addr {

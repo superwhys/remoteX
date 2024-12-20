@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"iter"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/superwhys/remoteX/internal/filesync/hash"
@@ -13,7 +14,7 @@ import (
 
 // HashMatch is used to compare the HashHead transmitted from the client
 // with the source file from the server
-func HashMatch(ctx context.Context, head *pb.HashHead, srcFile filesystem.File) (matchIter iter.Seq2[*pb.FileChunk, error], err error) {
+func HashMatch(ctx context.Context, head *pb.HashHead, srcFile filesystem.File, fi os.FileInfo) (matchIter iter.Seq2[*pb.FileChunk, error], err error) {
 	var (
 		buf         []byte
 		fileSize    int64
@@ -35,12 +36,6 @@ func HashMatch(ctx context.Context, head *pb.HashHead, srcFile filesystem.File) 
 	}
 
 	matchIter = func(yield func(*pb.FileChunk, error) bool) {
-		fi, err := srcFile.Stat()
-		if err != nil {
-			yield(nil, err)
-			return
-		}
-
 		fileSize = fi.Size()
 
 		// read the first pb.FileChunk with offset: 0
@@ -61,6 +56,7 @@ func HashMatch(ctx context.Context, head *pb.HashHead, srcFile filesystem.File) 
 
 			}
 			blockIdx, match := hashMap[sum]
+			// if match, yield first and check if the hash is match
 			if match {
 				yieldNotMatchData(true, yield)
 				for ; blockIdx < head.GetCheckSumCount(); blockIdx++ {
@@ -97,7 +93,6 @@ func HashMatch(ctx context.Context, head *pb.HashHead, srcFile filesystem.File) 
 					}
 				}
 			}
-
 			notMatchData = append(notMatchData, buf[0])
 			yieldNotMatchData(false, yield)
 
@@ -107,7 +102,6 @@ func HashMatch(ctx context.Context, head *pb.HashHead, srcFile filesystem.File) 
 			}
 
 			oldBuf := buf
-
 			l := blockLength
 			if remaining := fileSize - offset; remaining < l {
 				l = remaining

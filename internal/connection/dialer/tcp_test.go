@@ -18,7 +18,6 @@ func TestTcpDialer(t *testing.T) {
 	initTcpDialer()
 	t.Run("tcpDial", func(t *testing.T) {
 		local := &node.Node{
-			Name: "testDial",
 			Address: protocol.Address{
 				IpAddress: "127.0.0.1",
 				Port:      21011,
@@ -43,7 +42,6 @@ func TestTcpDialer(t *testing.T) {
 		local.NodeId = common.NewNodeID(cert.Certificate[0])
 
 		target := &node.Node{
-			Name: "testDialTarget",
 			Address: protocol.Address{
 				IpAddress: "localhost",
 				Port:      21012,

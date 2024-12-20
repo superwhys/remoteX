@@ -9,7 +9,7 @@ import (
 )
 
 type ProtoMessageWriter interface {
-	io.WriteCloser
+	io.Closer
 	WriteMessage(m proto.Message) error
 }
 
@@ -21,10 +21,6 @@ func NewProtoWriter(w io.WriteCloser) *ProtoWriter {
 	return &ProtoWriter{
 		writer: w,
 	}
-}
-
-func (w *ProtoWriter) Write(p []byte) (n int, err error) {
-	return w.writer.Write(p)
 }
 
 func (w *ProtoWriter) WriteMessage(msg proto.Message) error {

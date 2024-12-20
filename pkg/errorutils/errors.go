@@ -10,114 +10,116 @@ import (
 )
 
 const (
-	DefaultErrorCode = 10000400
+	DefaultErrorErrCode = 10000400
 )
 
 type RemoteXError struct {
-	cause  error
-	code   uint64
-	errMsg string
+	Cause   error
+	ErrCode uint64
+	ErrMsg  string
 }
 
 func (re *RemoteXError) Code() uint64 {
-	return re.code
+	return re.ErrCode
 }
 
 func (re *RemoteXError) Unwrap() error {
-	return re.cause
+	return re.Cause
 }
 
 func (re *RemoteXError) Error() string {
-	var errMsgs []string
+	var ErrMsgs []string
 	var originalCause error
 
 	current := re
 	for current != nil {
-		if current.errMsg != "" {
-			errMsgs = append(errMsgs, current.errMsg)
+		if current.ErrMsg != "" {
+			ErrMsgs = append(ErrMsgs, current.ErrMsg)
 		}
 
-		if current.cause == nil {
+		if current.Cause == nil {
 			break
 		}
 
 		nextError := new(RemoteXError)
-		if errors.As(current.cause, &nextError) {
+		if errors.As(current.Cause, &nextError) {
 			current = nextError
-			originalCause = nextError.cause
+			originalCause = nextError.Cause
 		} else {
-			originalCause = current.cause
+			originalCause = current.Cause
 			break
 		}
 	}
 
-	slices.Reverse(errMsgs)
+	slices.Reverse(ErrMsgs)
 
 	if originalCause == nil {
-		return fmt.Sprintf("RemoteXError(code=%d, errMsg=%s)",
-			re.code,
-			strings.Join(errMsgs, ": "))
+		return fmt.Sprintf("RemoteXError(ErrCode=%d, ErrMsg=%s)",
+			re.ErrCode,
+			strings.Join(ErrMsgs, ": "))
 	}
 
-	return fmt.Sprintf("RemoteXError(code=%d, cause=%v, errMsg=%s)",
-		re.code,
+	return fmt.Sprintf("RemoteXError(ErrCode=%d, Cause=%v, ErrMsg=%s)",
+		re.ErrCode,
 		originalCause,
-		strings.Join(errMsgs, ": "))
+		strings.Join(ErrMsgs, ": "))
 }
 
 func WrapRemoteXError(err error, msg string) *RemoteXError {
 	return &RemoteXError{
-		cause:  err,
-		code:   DefaultErrorCode,
-		errMsg: msg,
+		Cause:   err,
+		ErrCode: DefaultErrorErrCode,
+		ErrMsg:  msg,
 	}
 }
 
-func WithRemoteXError(code uint64, err error, msg string) *RemoteXError {
+func WithRemoteXError(ErrCode uint64, err error, msg string) *RemoteXError {
 	return &RemoteXError{
-		cause:  err,
-		code:   code,
-		errMsg: msg,
+		Cause:   err,
+		ErrCode: ErrCode,
+		ErrMsg:  msg,
 	}
 }
 
-func WithRemoteXErrorPackerErr(code uint64, msg string) func(err error) *RemoteXError {
+func WithRemoteXErrorPackerErr(ErrCode uint64, msg string) func(err error) *RemoteXError {
 	return func(err error) *RemoteXError {
-		return WithRemoteXError(code, errors.Wrap(err, msg), msg)
+		return WithRemoteXError(ErrCode, errors.Wrap(err, msg), msg)
 	}
 }
 
-func WithRemoteXErrorPackerMsg(code uint64, msg string) func(packMsg string) *RemoteXError {
+func WithRemoteXErrorPackerMsg(ErrCode uint64, msg string) func(packMsg string) *RemoteXError {
 	return func(packMsg string) *RemoteXError {
 		msg = fmt.Sprintf("%s: %s", msg, packMsg)
-		return WithRemoteXError(code, nil, msg)
+		return WithRemoteXError(ErrCode, nil, msg)
 	}
 }
 
-func WithRemoteXErrorPackerCommand(code uint64, msg string) func(cmd string, msgs ...string) *RemoteXError {
+func WithRemoteXErrorPackerCommand(ErrCode uint64, msg string) func(cmd string, msgs ...string) *RemoteXError {
 	return func(cmd string, msgs ...string) *RemoteXError {
 		msg = fmt.Sprintf("%s: %s: %s", msg, cmd, strings.Join(msgs, ", "))
-		return WithRemoteXError(code, nil, msg)
+		return WithRemoteXError(ErrCode, nil, msg)
 	}
 }
 
-func WithRemoteXErrorPackerNode(code uint64, msg string) func(nodeId common.NodeID) *RemoteXError {
+func WithRemoteXErrorPackerNode(ErrCode uint64, msg string) func(nodeId common.NodeID) *RemoteXError {
 	return func(nodeId common.NodeID) *RemoteXError {
-		msg = fmt.Sprintf("nodeId: %s. %s", nodeId, msg)
-		return WithRemoteXError(code, nil, msg)
+		if nodeId != "" {
+			msg = fmt.Sprintf("nodeId: %s. %s", nodeId, msg)
+		}
+		return WithRemoteXError(ErrCode, nil, msg)
 	}
 }
 
-func WithRemoteXErrorPackerFilesystem(code uint64, msg string) func(path string, err error) *RemoteXError {
+func WithRemoteXErrorPackerFilesystem(ErrCode uint64, msg string) func(path string, err error) *RemoteXError {
 	return func(path string, err error) *RemoteXError {
 		msg = fmt.Sprintf("Path(%s) %s", path, msg)
-		return WithRemoteXError(code, err, msg)
+		return WithRemoteXError(ErrCode, err, msg)
 	}
 }
 
 // inner error
 var (
-	// Connection errors code: 1000100 - 1000199
+	// Connection errors ErrCode: 1000100 - 1000199
 	ErrConnectionCert       = WithRemoteXError(1000100, nil, "Connection certificate invalidate")
 	ErrConnectToMyself      = WithRemoteXError(1000101, nil, "Connected to myself")
 	ErrConnectNotFound      = WithRemoteXError(1000102, nil, "Connection not found")
@@ -129,7 +131,7 @@ var (
 	ErrStreamReadMessage    = WithRemoteXErrorPackerErr(1000108, "Stream read message error")
 	ErrGetHeartbeatStream   = WithRemoteXErrorPackerErr(10000109, "Get heartbeat stream error")
 
-	// Command errors code: 10000200 - 10000299
+	// Command errors ErrCode: 10000200 - 10000299
 	ErrCommandTypeNotSupport   = WithRemoteXErrorPackerCommand(10000200, "Command type not support")
 	ErrCommandArgsError        = WithRemoteXErrorPackerCommand(10000201, "Command args error")
 	ErrCommandMissingArguments = WithRemoteXErrorPackerCommand(10000202, "Missing arguments")
@@ -137,12 +139,12 @@ var (
 	ErrHandleCommand           = WithRemoteXErrorPackerCommand(10000204, "Command handle error")
 	ErrReadCommand             = WithRemoteXErrorPackerErr(10000205, "Read command error")
 
-	// Node errors code: 10000300 - 10000399
+	// Node errors ErrCode: 10000300 - 10000399
 	ErrSameOnlineNode      = WithRemoteXErrorPackerNode(10000300, "Same online node error")
 	ErrNodeMissingHostPort = WithRemoteXErrorPackerNode(10000300, "Node missing host port error")
 	ErrNodeNotFound        = WithRemoteXErrorPackerNode(10000301, "Node not found error")
 
-	// Filesystem errors code: 20000100-20000199
+	// Filesystem errors ErrCode: 20000100-20000199
 	ErrFilePathNotFound = WithRemoteXErrorPackerFilesystem(20000100, "File path not found")
 	ErrDirPathNotFound  = WithRemoteXErrorPackerFilesystem(20000101, "Directory path not found")
 	ErrDirPathNotAbs    = WithRemoteXErrorPackerFilesystem(20000102, "Directory path must be absolute")

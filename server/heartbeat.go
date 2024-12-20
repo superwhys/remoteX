@@ -68,8 +68,7 @@ func (s *RemoteXServer) sendHeartbeat(stream connection.Stream) error {
 		return errorutils.WrapRemoteXError(err, "send heartbeat")
 	}
 
-	plog.Debugf("send heartbeat to %v", stream.RemoteAddr())
-
+	plog.Debugf("send heartbeat to node: %v remoteAddr: %v", stream.GetNodeId(), stream.RemoteAddr())
 	return nil
 }
 

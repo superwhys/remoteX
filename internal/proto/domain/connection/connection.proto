@@ -7,12 +7,11 @@ import "pkg/protocol/protocol.proto";
 
 message Connection {
   string connection_id = 1;
-  string node_id = 2 [(ext.goname) = "NodeId", (ext.json) = "node_id", (ext.node_id) = true];
-  string local_address = 3;
-  string remote_address = 4;
-  protocol.ConnectionProtocol protocol = 5;
-  protocol.ConnectionType connect_type = 6;
-  protocol.ConnectionStatus status = 7;
-  int64 start_time = 8;
-  int64 last_heartbeat = 9;
+  string local_address = 2;
+  string remote_address = 3;
+  protocol.ConnectionProtocol protocol = 4;
+  protocol.ConnectionType connect_type = 5;
+  protocol.ConnectionStatus status = 6;
+  int64 start_time = 7;
+  int64 last_heartbeat = 8;
 }

@@ -22,6 +22,10 @@ func NewNodeService(local *node.Node) *ServiceImpl {
 		rl:        &sync.RWMutex{},
 		nodes:     make(map[common.NodeID]*node.Node),
 	}
+
+	os, arch := osutils.GetOsArch()
+	local.Configuration.Os = node.GetOsName(os)
+	local.Configuration.Arch = node.GetArch(arch)
 	copyNode := *local
 	s.localNode = &copyNode
 
