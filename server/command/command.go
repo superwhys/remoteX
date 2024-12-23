@@ -9,6 +9,7 @@ import (
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/pkg/errorutils"
 	"github.com/superwhys/remoteX/server/command/filesystem"
+	"github.com/superwhys/remoteX/server/command/proxy"
 	"github.com/superwhys/remoteX/server/command/sync"
 	"github.com/superwhys/remoteX/server/command/tunnel"
 )
@@ -25,11 +26,13 @@ func NewCommandService() command.Service {
 	fsSrv := filesystem.NewFilesystemService()
 	syncSrv := sync.NewSyncService()
 	tunnelSrv := tunnel.NewTunnelService()
+	proxySrv := proxy.NewProxyService()
 
 	s.RegisterProvider(s)
 	s.RegisterProvider(fsSrv)
 	s.RegisterProvider(syncSrv)
 	s.RegisterProvider(tunnelSrv)
+	s.RegisterProvider(proxySrv)
 
 	return s
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/superwhys/remoteX/domain/connection"
@@ -14,6 +15,7 @@ type CommandContext struct {
 	IsRemote       bool
 	Remote         connection.Stream
 	RawRemote      connection.StreamConnection
+	ProxyReq       *http.Request
 	ExchangeWriter io.Writer
 }
 

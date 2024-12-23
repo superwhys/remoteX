@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
@@ -109,7 +110,7 @@ func (s *RemoteXServer) HandleCommandWithRawRemote(ctx context.Context, nodeId c
 	})
 }
 
-func (s *RemoteXServer) HandleCommandWithWriterExchange(ctx context.Context, nodeId common.NodeID, cmd *command.Command, writer io.Writer) error {
+func (s *RemoteXServer) HandleCommandWithReqExchange(ctx context.Context, nodeId common.NodeID, cmd *command.Command, req *http.Request, writer io.Writer) error {
 	conn, err := s.getConnWithNodeId(nodeId)
 	if err != nil {
 		return errors.Wrap(err, "getConnection")
@@ -124,6 +125,7 @@ func (s *RemoteXServer) HandleCommandWithWriterExchange(ctx context.Context, nod
 	_, err = s.CommandService.Execute(ctx, cmd, &command.CommandContext{
 		IsRemote:       true,
 		Remote:         stream,
+		ProxyReq:       req,
 		ExchangeWriter: writer,
 	})
 	if err != nil {

@@ -11,6 +11,7 @@ package proxy
 import (
 	"context"
 	"io"
+	"net/http"
 
 	"github.com/superwhys/remoteX/domain/command"
 	"github.com/superwhys/remoteX/domain/connection"
@@ -18,5 +19,5 @@ import (
 
 type Service interface {
 	command.CommandProvider
-	Proxy(ctx context.Context, args command.Args, stream connection.Stream, w io.Writer) error
+	Proxy(ctx context.Context, args command.Args, stream connection.Stream, req *http.Request, w io.Writer) error
 }

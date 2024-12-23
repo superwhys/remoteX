@@ -34,7 +34,7 @@ func (p proxy) toCommand() *command.Command {
 }
 
 func (p proxy) Handle(c *gin.Context, srv *server.RemoteXServer) (resp *command.Ret, err error) {
-	err = srv.HandleCommandWithWriterExchange(context.TODO(), common.NodeID(p.Node), p.toCommand(), c.Writer)
+	err = srv.HandleCommandWithReqExchange(context.TODO(), common.NodeID(p.Node), p.toCommand(), c.Request, c.Writer)
 	if err != nil {
 		return nil, errorutils.WrapRemoteXError(err, "handleCommandWithWriterExchange")
 	}

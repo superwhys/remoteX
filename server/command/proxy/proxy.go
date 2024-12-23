@@ -47,7 +47,7 @@ func (s *ServiceImpl) SupportedCommands() []command.CommandType {
 func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, cmdCtx *command.CommandContext) (proto.Message, error) {
 	switch cmd.Type {
 	case command.Proxy:
-		err := s.Proxy(ctx, cmd.GetArgs(), cmdCtx.Remote, cmdCtx.ExchangeWriter)
+		err := s.Proxy(ctx, cmd.GetArgs(), cmdCtx.Remote, cmdCtx.ProxyReq, cmdCtx.ExchangeWriter)
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +57,7 @@ func (s *ServiceImpl) Invoke(ctx context.Context, cmd *command.Command, cmdCtx *
 	}
 }
 
-func (s *ServiceImpl) Proxy(ctx context.Context, args command.Args, stream connection.Stream, exchangeWriter io.Writer) error {
+func (s *ServiceImpl) Proxy(ctx context.Context, args command.Args, stream connection.Stream, req *http.Request, exchangeWriter io.Writer) error {
 	isServerArg, exists := args.GetArg("is_server")
 	if !exists {
 		return errorutils.ErrCommandMissingArguments(command.Proxy.String(), isServerKey)
@@ -65,15 +65,15 @@ func (s *ServiceImpl) Proxy(ctx context.Context, args command.Args, stream conne
 
 	switch isServerArg.GetBoolValue() {
 	case true:
-		return s.proxyServer(ctx, args, stream, exchangeWriter)
+		return s.proxyServer(ctx, args, stream, req, exchangeWriter)
 	case false:
-		return s.proxyClient(ctx, args, stream, exchangeWriter)
+		return s.proxyClient(ctx, args, stream)
 	}
 
 	return nil
 }
 
-func (s *ServiceImpl) proxyServer(_ context.Context, args command.Args, stream connection.Stream, exchangeWriter io.Writer) error {
+func (s *ServiceImpl) proxyServer(ctx context.Context, args command.Args, stream connection.Stream, req *http.Request, exchangeWriter io.Writer) error {
 	args[isServerKey] = command.BoolArg(false)
 	cmd := &command.Command{
 		Type: command.Proxy,
@@ -85,6 +85,11 @@ func (s *ServiceImpl) proxyServer(_ context.Context, args command.Args, stream c
 		return errorutils.WrapRemoteXError(err, "writeProxyServerCmd")
 	}
 
+	err = req.Write(stream)
+	if err != nil {
+		return errorutils.WrapRemoteXError(err, "writeProxyServerReq")
+	}
+
 	hijacker, ok := exchangeWriter.(http.Hijacker)
 	if !ok {
 		return errorutils.WrapRemoteXError(nil, "hijacking not supported")
@@ -94,15 +99,36 @@ func (s *ServiceImpl) proxyServer(_ context.Context, args command.Args, stream c
 	if err != nil {
 		return errorutils.WrapRemoteXError(err, "getHijackConn")
 	}
+	eg, ctx := errgroup.WithContext(ctx)
 
-	defer conn.Close()
-	if _, err = io.Copy(conn, stream); err != nil {
-		return errorutils.WrapRemoteXError(err, "copyConnToStream")
-	}
-	return nil
+	eg.Go(func() error {
+		<-ctx.Done()
+		_ = conn.Close()
+		plog.Debugc(ctx, "proxyHijack: close connections")
+		return stream.Close()
+	})
+
+	eg.Go(func() error {
+		defer plog.Debugc(ctx, "proxyServer: copy stream to conn")
+		_, err := io.Copy(conn, stream)
+		if err != nil {
+			return errorutils.WrapRemoteXError(err, "copyStreamToConn")
+		}
+		return nil
+	})
+	eg.Go(func() error {
+		defer plog.Debugc(ctx, "proxyServer: copy conn to stream")
+		_, err := io.Copy(stream, conn)
+		if err != nil {
+			return errorutils.WrapRemoteXError(err, "copyConnToStream")
+		}
+		return nil
+	})
+
+	return eg.Wait()
 }
 
-func (s *ServiceImpl) proxyClient(ctx context.Context, args command.Args, stream connection.Stream, exchangeWriter io.Writer) error {
+func (s *ServiceImpl) proxyClient(ctx context.Context, args command.Args, stream connection.Stream) error {
 	proxyAddrArg, exists := args.GetArg(proxyAddrKey)
 	if !exists {
 		return errorutils.ErrCommandMissingArguments(command.Proxy.String(), proxyAddrKey)
@@ -117,11 +143,11 @@ func (s *ServiceImpl) proxyClient(ctx context.Context, args command.Args, stream
 	eg.Go(func() error {
 		<-ctx.Done()
 		_ = conn.Close()
-		plog.Debugc(ctx, "forwardService: close connections")
+		plog.Debugc(ctx, "proxyClient: close connections")
 		return stream.Close()
 	})
 	eg.Go(func() error {
-		defer plog.Debugc(ctx, "forwardService:copy to remote over")
+		defer plog.Debugc(ctx, "proxyClient: copy stream to conn")
 		_, err := io.Copy(conn, stream)
 		if err != nil {
 			return errorutils.WrapRemoteXError(err, "copyStreamToConn")
@@ -129,7 +155,7 @@ func (s *ServiceImpl) proxyClient(ctx context.Context, args command.Args, stream
 		return nil
 	})
 	eg.Go(func() error {
-		defer plog.Debugc(ctx, "forwardService:copy to tcp connection over")
+		defer plog.Debugc(ctx, "proxyClient: copy conn to stream")
 		_, err := io.Copy(stream, conn)
 		if err != nil {
 			return errorutils.WrapRemoteXError(err, "copyConnToStream")
