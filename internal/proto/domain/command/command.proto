@@ -19,6 +19,7 @@ enum CommandType {
 	ReverseReceive = 8;
 	ListTunnel = 9;
 	CloseTunnel = 10;
+	Proxy = 11;
 }
 
 message Command {

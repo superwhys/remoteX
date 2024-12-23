@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/go-puzzles/puzzles/plog"
 	"github.com/pkg/errors"
@@ -62,7 +63,7 @@ func (s *RemoteXServer) HandleLocalCommand(ctx context.Context, cmd *command.Com
 	return s.CommandService.Execute(ctx, cmd, &command.CommandContext{})
 }
 
-func (s *RemoteXServer) HandleCommandWithRemote(ctx context.Context, nodeId common.NodeID, cmd *command.Command) (resp *command.Ret, err error) {
+func (s *RemoteXServer) getConnWithNodeId(nodeId common.NodeID) (connection.TlsConn, error) {
 	remoteNode, err := s.NodeService.GetNode(nodeId)
 	if err != nil {
 		return nil, errors.Wrap(err, "getNode")
@@ -71,6 +72,15 @@ func (s *RemoteXServer) HandleCommandWithRemote(ctx context.Context, nodeId comm
 	connId := remoteNode.GetConnectionId()
 
 	conn, err := s.ConnService.GetConnection(connId)
+	if err != nil {
+		return nil, errors.Wrap(err, "getConnection")
+	}
+
+	return conn, nil
+}
+
+func (s *RemoteXServer) HandleCommandWithRemote(ctx context.Context, nodeId common.NodeID, cmd *command.Command) (resp *command.Ret, err error) {
+	conn, err := s.getConnWithNodeId(nodeId)
 	if err != nil {
 		return nil, errors.Wrap(err, "getConnection")
 	}
@@ -88,14 +98,7 @@ func (s *RemoteXServer) HandleCommandWithRemote(ctx context.Context, nodeId comm
 }
 
 func (s *RemoteXServer) HandleCommandWithRawRemote(ctx context.Context, nodeId common.NodeID, cmd *command.Command) (resp *command.Ret, err error) {
-	remoteNode, err := s.NodeService.GetNode(nodeId)
-	if err != nil {
-		return nil, errors.Wrap(err, "getNode")
-	}
-
-	connId := remoteNode.GetConnectionId()
-
-	conn, err := s.ConnService.GetConnection(connId)
+	conn, err := s.getConnWithNodeId(nodeId)
 	if err != nil {
 		return nil, errors.Wrap(err, "getConnection")
 	}
@@ -104,4 +107,28 @@ func (s *RemoteXServer) HandleCommandWithRawRemote(ctx context.Context, nodeId c
 		IsRemote:  true,
 		RawRemote: conn,
 	})
+}
+
+func (s *RemoteXServer) HandleCommandWithWriterExchange(ctx context.Context, nodeId common.NodeID, cmd *command.Command, writer io.Writer) error {
+	conn, err := s.getConnWithNodeId(nodeId)
+	if err != nil {
+		return errors.Wrap(err, "getConnection")
+	}
+
+	stream, err := conn.OpenStream()
+	if err != nil {
+		return errors.Wrap(err, "openStream")
+	}
+	defer stream.Close()
+
+	_, err = s.CommandService.Execute(ctx, cmd, &command.CommandContext{
+		IsRemote:       true,
+		Remote:         stream,
+		ExchangeWriter: writer,
+	})
+	if err != nil {
+		return errors.Wrap(err, "execute command")
+	}
+
+	return nil
 }

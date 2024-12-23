@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"encoding/json"
+	"io"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/superwhys/remoteX/domain/connection"
@@ -10,9 +11,10 @@ import (
 )
 
 type CommandContext struct {
-	IsRemote  bool
-	Remote    connection.Stream
-	RawRemote connection.StreamConnection
+	IsRemote       bool
+	Remote         connection.Stream
+	RawRemote      connection.StreamConnection
+	ExchangeWriter io.Writer
 }
 
 type CommandProvider interface {
